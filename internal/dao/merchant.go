@@ -73,3 +73,8 @@ func (r *merchantRepo) SetStatus(ctx context.Context, id int64, status int) erro
 	}).Update()
 	return err
 }
+
+// CountActiveSites 商户名下未停用的站点数(控制面同库, dao 层内联查询)。
+func (r *merchantRepo) CountActiveSites(ctx context.Context, merchantId int64) (int, error) {
+	return g.Model("site").Ctx(ctx).Where("merchant_id", merchantId).WhereNot("status", 2).Count()
+}

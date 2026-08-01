@@ -79,8 +79,7 @@ func (s *sMerchant) Update(ctx context.Context, in service.SaveInput) error {
 	})
 }
 
-// SetStatus 启用(1)/停用(0)。不物理删除。
-// TODO(M2): 停用前校验名下站点状态, 提示影响范围。
+// SetStatus 启用(1)/停用(0)。不物理删除; 停用前校验名下站点(M2)。
 func (s *sMerchant) SetStatus(ctx context.Context, id int64, status int) error {
 	if id <= 0 {
 		return gerror.New("商户ID无效")
@@ -94,6 +93,16 @@ func (s *sMerchant) SetStatus(ctx context.Context, id int64, status int) error {
 	}
 	if m == nil {
 		return gerror.New("商户不存在")
+	}
+	if status == 0 {
+		// M2 停用保护: 名下还有未停用站点时拒绝
+		cnt, err := s.repo.CountActiveSites(ctx, id)
+		if err != nil {
+			return err
+		}
+		if cnt > 0 {
+			return gerror.Newf("该商户名下仍有 %d 个未停用站点, 请先停用站点", cnt)
+		}
 	}
 	return s.repo.SetStatus(ctx, id, status)
 }

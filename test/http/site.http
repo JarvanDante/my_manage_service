@@ -1,0 +1,209 @@
+###############################################################################
+# 总后台 M2 · 站点管理 + 域名分配 真实端到端测试(:8003)
+# 前置: 服务启动时已设置 MANAGE_SECRET(AES 密钥); db-check 用真实的 my_service 库信息
+# site_code / 域名带时间戳, 可重复运行
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8003
+
+### 1. 登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("mToken", response.body.data.token);
+%}
+
+### 2. 建测试商户
+POST {{baseUrl}}/manage/merchants
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "E2E站点商户-{{$timestamp}}", "contact": "站点测试" }
+
+> {%
+client.test("建商户成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("mid", response.body.data.id);
+%}
+
+### 3. 创建站点(登记真实的 my_service 库, 供 db-check 真连)
+POST {{baseUrl}}/manage/sites
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{
+  "merchant_id": {{mid}},
+  "site_code": "e2e{{$timestamp}}",
+  "name": "E2E测试站",
+  "env": "dev",
+  "db_host": "127.0.0.1",
+  "db_port": 5432,
+  "db_name": "my_service",
+  "db_user": "postgres",
+  "db_pass": "654321",
+  "remark": "E2E"
+}
+
+> {%
+client.test("建站成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回站点ID");
+});
+client.global.set("sid", response.body.data.id);
+%}
+
+### 4. site_code 非法 —— 应被拒
+POST {{baseUrl}}/manage/sites
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "merchant_id": {{mid}}, "site_code": "9BadCode!", "name": "坏站", "env": "dev",
+  "db_host": "127.0.0.1", "db_port": 5432, "db_name": "x", "db_user": "x", "db_pass": "x" }
+
+> {%
+client.test("site_code 非法被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: site_code 格式");
+});
+%}
+
+### 5. 列表命中且 db_pass 脱敏
+GET {{baseUrl}}/manage/sites?keyword=E2E测试站
+Authorization: {{mToken}}
+
+> {%
+client.test("列表命中且脱敏", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var s = response.body.data.list.find(function (x) { return x.id === client.global.get("sid"); });
+    client.assert(s, "应包含新站点");
+    client.assert(s.db_pass === "******", "db_pass 应脱敏");
+    client.assert(s.merchant_name !== "", "应联表带出商户名");
+});
+%}
+
+### 6. db-check —— 真连站点库应成功
+POST {{baseUrl}}/manage/sites/{{sid}}/db-check
+Authorization: {{mToken}}
+
+> {%
+client.test("db-check 连接正常", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.ok === true, "应连接成功: " + response.body.data.message);
+});
+%}
+
+### 7. 绑定域名 A —— 首个自动为主域名
+POST {{baseUrl}}/manage/sites/{{sid}}/domains
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "domain": "a-{{$timestamp}}.example.com", "https": 1 }
+
+> {%
+client.test("绑定域名A成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("domA", response.body.data.domain_id);
+%}
+
+### 8. 绑定域名 B
+POST {{baseUrl}}/manage/sites/{{sid}}/domains
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "domain": "b-{{$timestamp}}.example.com", "https": 1 }
+
+> {%
+client.test("绑定域名B成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("domB", response.body.data.domain_id);
+%}
+
+### 9. 详情: A 应为主域名, 共2个域名
+GET {{baseUrl}}/manage/sites/{{sid}}
+Authorization: {{mToken}}
+
+> {%
+client.test("首个域名自动为主", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.domains.length === 2, "应2个域名");
+    var a = response.body.data.domains.find(function (d) { return d.id === client.global.get("domA"); });
+    client.assert(a.is_main === 1, "A 应为主域名");
+});
+%}
+
+### 10. 解绑主域名 A —— 应被拒
+DELETE {{baseUrl}}/manage/sites/{{sid}}/domains/{{domA}}
+Authorization: {{mToken}}
+
+> {%
+client.test("主域名不可解绑", function () {
+    client.assert(response.body.code !== 0, "应报错: 先切换主域名");
+});
+%}
+
+### 11. 把 B 设为主域名
+POST {{baseUrl}}/manage/sites/{{sid}}/domains/{{domB}}/main
+Authorization: {{mToken}}
+
+> {%
+client.test("切换主域名成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 12. 现在解绑 A —— 成功
+DELETE {{baseUrl}}/manage/sites/{{sid}}/domains/{{domA}}
+Authorization: {{mToken}}
+
+> {%
+client.test("解绑A成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 13. 商户名下有未停用站点 —— 停用商户应被拒
+POST {{baseUrl}}/manage/merchants/{{mid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 0 }
+
+> {%
+client.test("有站点时停用商户被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 名下仍有未停用站点");
+});
+%}
+
+### 14. 停用站点
+POST {{baseUrl}}/manage/sites/{{sid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 2 }
+
+> {%
+client.test("停用站点成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 15. 再停用商户 —— 成功
+POST {{baseUrl}}/manage/merchants/{{mid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 0 }
+
+> {%
+client.test("站点停用后商户可停用", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

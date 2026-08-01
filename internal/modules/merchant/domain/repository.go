@@ -20,4 +20,6 @@ type Repository interface {
 	Create(ctx context.Context, m *entity.Merchant) (int64, error)
 	Update(ctx context.Context, m *entity.Merchant) error
 	SetStatus(ctx context.Context, id int64, status int) error
+	// CountActiveSites 商户名下未停用(status!=2)的站点数(M2 停用保护)。
+	CountActiveSites(ctx context.Context, merchantId int64) (int, error)
 }

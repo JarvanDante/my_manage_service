@@ -11,6 +11,7 @@ import (
 	"github.com/JarvanDante/my_manage_service/internal/dao"
 	authmod "github.com/JarvanDante/my_manage_service/internal/modules/auth"
 	merchmod "github.com/JarvanDante/my_manage_service/internal/modules/merchant"
+	sitemod "github.com/JarvanDante/my_manage_service/internal/modules/site"
 	"github.com/JarvanDante/my_manage_service/internal/shared/middleware"
 )
 
@@ -35,6 +36,7 @@ var Main = gcmd.Command{
 			group.Group("/", func(perm *ghttp.RouterGroup) {
 				perm.Middleware(middleware.ManageAuth, middleware.ManagePerm, middleware.ManageOpLog)
 				merchmod.Register(perm, dao.NewMerchantRepo())
+				sitemod.Register(perm, dao.NewSiteRepo())
 			})
 		})
 
