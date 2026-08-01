@@ -1,0 +1,134 @@
+###############################################################################
+# 总后台 M1 · 商户管理 真实端到端测试(:8003)
+# 商户名带时间戳, 可重复运行(不物理删除, 停用即归档)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8003
+
+### 1. 登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("mToken", response.body.data.token);
+%}
+
+### 2. 创建商户
+POST {{baseUrl}}/manage/merchants
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "E2E商户-{{$timestamp}}", "contact": "王测试", "phone": "13800000000", "remark": "E2E" }
+
+> {%
+client.test("创建商户成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回商户ID");
+});
+client.global.set("mid", response.body.data.id);
+%}
+
+### 3. 列表按关键字命中并取回名称
+GET {{baseUrl}}/manage/merchants?keyword=E2E商户&status=1&page=1&size=10
+Authorization: {{mToken}}
+
+> {%
+client.test("列表命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var m = response.body.data.list.find(function (x) { return x.id === client.global.get("mid"); });
+    client.assert(m, "应包含刚创建的商户");
+    client.assert(m.contact === "王测试", "联系人应一致");
+    client.global.set("mname", m.name);
+});
+%}
+
+### 4. 同名创建 —— 应被拒
+POST {{baseUrl}}/manage/merchants
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "{{mname}}" }
+
+> {%
+client.test("同名被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 商户名已存在");
+});
+%}
+
+### 5. 更新商户(改联系人/备注)
+PUT {{baseUrl}}/manage/merchants/{{mid}}
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "{{mname}}", "contact": "李接手", "phone": "13900000000", "remark": "E2E已更新" }
+
+> {%
+client.test("更新成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 6. 停用商户
+POST {{baseUrl}}/manage/merchants/{{mid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 0 }
+
+> {%
+client.test("停用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 7. 启用列表不含已停用商户
+GET {{baseUrl}}/manage/merchants?keyword=E2E商户&status=1&page=1&size=50
+Authorization: {{mToken}}
+
+> {%
+client.test("停用后不在启用列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (x) { return x.id === client.global.get("mid"); });
+    client.assert(!hit, "启用列表不应包含已停用商户");
+});
+%}
+
+### 8. 停用列表包含它(且联系人已更新)
+GET {{baseUrl}}/manage/merchants?status=2&page=1&size=50
+Authorization: {{mToken}}
+
+> {%
+client.test("停用列表命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var m = response.body.data.list.find(function (x) { return x.id === client.global.get("mid"); });
+    client.assert(m, "停用列表应包含");
+    client.assert(m.contact === "李接手", "更新应生效");
+});
+%}
+
+### 9. 重新启用(保持数据干净可复用)
+POST {{baseUrl}}/manage/merchants/{{mid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("启用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 无 token —— 应被拒
+GET {{baseUrl}}/manage/merchants
+
+> {%
+client.test("未登录被拒", function () {
+    client.assert(response.body.code !== 0, "无 token 应报错");
+});
+%}

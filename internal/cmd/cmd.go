@@ -10,6 +10,7 @@ import (
 
 	"github.com/JarvanDante/my_manage_service/internal/dao"
 	authmod "github.com/JarvanDante/my_manage_service/internal/modules/auth"
+	merchmod "github.com/JarvanDante/my_manage_service/internal/modules/merchant"
 	"github.com/JarvanDante/my_manage_service/internal/shared/middleware"
 )
 
@@ -33,7 +34,7 @@ var Main = gcmd.Command{
 			// 需权限校验: 业务接口(M1 商户起挂这里)
 			group.Group("/", func(perm *ghttp.RouterGroup) {
 				perm.Middleware(middleware.ManageAuth, middleware.ManagePerm, middleware.ManageOpLog)
-				_ = perm // M1: merchantmod.RegisterBackend(perm, dao.NewMerchantRepo())
+				merchmod.Register(perm, dao.NewMerchantRepo())
 			})
 		})
 
