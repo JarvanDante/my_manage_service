@@ -25,7 +25,7 @@ func RegisterPermManage(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := controller.New(logic.New(repo))
 	group.Bind(
 		ctrl.RoleList, ctrl.RoleCreate, ctrl.RoleUpdate, ctrl.RoleDelete,
-		ctrl.PermList, ctrl.PermAdd, ctrl.PermDel,
+		ctrl.PermTree, ctrl.PermCreate, ctrl.PermUpdate, ctrl.PermDelete,
 		ctrl.AdminList, ctrl.AdminCreate, ctrl.AdminUpdate, ctrl.AdminDelete,
 	)
 }

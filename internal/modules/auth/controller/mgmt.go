@@ -17,13 +17,13 @@ func (c *Controller) RoleList(ctx context.Context, req *v1.RoleListReq) (res *v1
 	}
 	items := make([]v1.RoleItem, 0, len(list))
 	for _, r := range list {
-		items = append(items, v1.RoleItem{Id: r.Id, Name: r.Name, Code: r.Code, Remark: r.Remark, Status: r.Status})
+		items = append(items, v1.RoleItem{Id: r.Id, Name: r.Name, Code: r.Code, Remark: r.Remark, Status: r.Status, Permissions: r.Permissions})
 	}
 	return &v1.RoleListRes{List: items}, nil
 }
 
 func (c *Controller) RoleCreate(ctx context.Context, req *v1.RoleCreateReq) (res *v1.RoleCreateRes, err error) {
-	id, err := c.auth.CreateRole(ctx, service.RoleCreateInput{Name: req.Name, Code: req.Code, Remark: req.Remark})
+	id, err := c.auth.CreateRole(ctx, service.RoleCreateInput{Name: req.Name, Code: req.Code, Remark: req.Remark, Permissions: req.Permissions})
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (c *Controller) RoleCreate(ctx context.Context, req *v1.RoleCreateReq) (res
 }
 
 func (c *Controller) RoleUpdate(ctx context.Context, req *v1.RoleUpdateReq) (res *v1.RoleUpdateRes, err error) {
-	if err = c.auth.UpdateRole(ctx, service.RoleUpdateInput{Id: req.Id, Name: req.Name, Remark: req.Remark, Status: req.Status}); err != nil {
+	if err = c.auth.UpdateRole(ctx, service.RoleUpdateInput{Id: req.Id, Name: req.Name, Remark: req.Remark, Status: req.Status, Permissions: req.Permissions}); err != nil {
 		return nil, err
 	}
 	return &v1.RoleUpdateRes{}, nil
@@ -42,34 +42,6 @@ func (c *Controller) RoleDelete(ctx context.Context, req *v1.RoleDeleteReq) (res
 		return nil, err
 	}
 	return &v1.RoleDeleteRes{}, nil
-}
-
-// ---------- 权限 ----------
-
-func (c *Controller) PermList(ctx context.Context, req *v1.PermListReq) (res *v1.PermListRes, err error) {
-	list, err := c.auth.ListPerms(ctx, req.Code)
-	if err != nil {
-		return nil, err
-	}
-	items := make([]v1.PermItem, 0, len(list))
-	for _, p := range list {
-		items = append(items, v1.PermItem{Path: p.Path, Method: p.Method})
-	}
-	return &v1.PermListRes{List: items}, nil
-}
-
-func (c *Controller) PermAdd(ctx context.Context, req *v1.PermAddReq) (res *v1.PermAddRes, err error) {
-	if err = c.auth.AddPerm(ctx, req.Code, req.Path, req.Method); err != nil {
-		return nil, err
-	}
-	return &v1.PermAddRes{}, nil
-}
-
-func (c *Controller) PermDel(ctx context.Context, req *v1.PermDelReq) (res *v1.PermDelRes, err error) {
-	if err = c.auth.RemovePerm(ctx, req.Code, req.Path, req.Method); err != nil {
-		return nil, err
-	}
-	return &v1.PermDelRes{}, nil
 }
 
 // ---------- 管理员账号 ----------

@@ -6,11 +6,12 @@ import "github.com/gogf/gf/v2/frame/g"
 // ---------- 角色 ----------
 
 type RoleItem struct {
-	Id     int64  `json:"id"`
-	Name   string `json:"name"`
-	Code   string `json:"code"`
-	Remark string `json:"remark"`
-	Status int    `json:"status"`
+	Id          int64  `json:"id"`
+	Name        string `json:"name"`
+	Code        string `json:"code"`
+	Remark      string `json:"remark"`
+	Status      int    `json:"status"`
+	Permissions string `json:"permissions"`
 }
 
 type RoleListReq struct {
@@ -21,21 +22,23 @@ type RoleListRes struct {
 }
 
 type RoleCreateReq struct {
-	g.Meta `path:"/roles" method:"post" tags:"Manage/Role" summary:"创建角色"`
-	Name   string `json:"name" v:"required#角色名必填"`
-	Code   string `json:"code" v:"required#角色码必填"`
-	Remark string `json:"remark"`
+	g.Meta      `path:"/roles" method:"post" tags:"Manage/Role" summary:"创建角色"`
+	Name        string `json:"name" v:"required#角色名必填"`
+	Code        string `json:"code" v:"required#角色码必填"`
+	Remark      string `json:"remark"`
+	Permissions string `json:"permissions"`
 }
 type RoleCreateRes struct {
 	Id int64 `json:"id"`
 }
 
 type RoleUpdateReq struct {
-	g.Meta `path:"/roles/{id}" method:"put" tags:"Manage/Role" summary:"更新角色"`
-	Id     int64  `json:"id"   v:"required|min:1#角色ID必填|角色ID必须大于0"`
-	Name   string `json:"name" v:"required#角色名必填"`
-	Remark string `json:"remark"`
-	Status int    `json:"status" v:"in:0,1#status 仅支持 0/1"`
+	g.Meta      `path:"/roles/{id}" method:"put" tags:"Manage/Role" summary:"更新角色"`
+	Id          int64  `json:"id"   v:"required|min:1#角色ID必填|角色ID必须大于0"`
+	Name        string `json:"name" v:"required#角色名必填"`
+	Remark      string `json:"remark"`
+	Status      int    `json:"status" v:"in:0,1#status 仅支持 0/1"`
+	Permissions string `json:"permissions"`
 }
 type RoleUpdateRes struct{}
 
@@ -44,37 +47,6 @@ type RoleDeleteReq struct {
 	Id     int64 `json:"id" v:"required|min:1#角色ID必填|角色ID必须大于0"`
 }
 type RoleDeleteRes struct{}
-
-// ---------- 角色权限(Casbin) ----------
-
-type PermItem struct {
-	Path   string `json:"path"`
-	Method string `json:"method"`
-}
-
-type PermListReq struct {
-	g.Meta `path:"/roles/{code}/perms" method:"get" tags:"Manage/Role" summary:"角色权限列表"`
-	Code   string `json:"code" v:"required#角色码必填"`
-}
-type PermListRes struct {
-	List []PermItem `json:"list"`
-}
-
-type PermAddReq struct {
-	g.Meta `path:"/roles/{code}/perms" method:"post" tags:"Manage/Role" summary:"新增角色权限"`
-	Code   string `json:"code"   v:"required#角色码必填"`
-	Path   string `json:"path"   v:"required#路径必填"`
-	Method string `json:"method" v:"required#方法必填"`
-}
-type PermAddRes struct{}
-
-type PermDelReq struct {
-	g.Meta `path:"/roles/{code}/perms" method:"delete" tags:"Manage/Role" summary:"删除角色权限"`
-	Code   string `json:"code"   v:"required#角色码必填"`
-	Path   string `json:"path"   v:"required#路径必填"`
-	Method string `json:"method" v:"required#方法必填"`
-}
-type PermDelRes struct{}
 
 // ---------- 管理员账号 ----------
 

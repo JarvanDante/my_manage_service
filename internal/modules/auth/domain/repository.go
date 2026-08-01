@@ -18,7 +18,7 @@ type Repository interface {
 	FindRoleById(ctx context.Context, id int64) (*entity.ManageRole, error)
 	FindRoleByCode(ctx context.Context, code string) (*entity.ManageRole, error)
 	CreateRole(ctx context.Context, r *entity.ManageRole) (int64, error)
-	UpdateRole(ctx context.Context, id int64, name, remark string, status int) error
+	UpdateRole(ctx context.Context, id int64, name, remark string, status int, permissions string) error
 	DeleteRole(ctx context.Context, id int64) error
 	CountAdminsByRoleId(ctx context.Context, roleId int64) (int, error)
 
@@ -27,4 +27,13 @@ type Repository interface {
 	CreateAdmin(ctx context.Context, a *entity.ManageAdmin) (int64, error)
 	UpdateAdmin(ctx context.Context, id int64, nickname string, roleId int64, status int, password, salt string) error
 	DeleteAdmin(ctx context.Context, id int64) error
+
+	// 权限树(RBAC 菜单+接口权限)
+	ListPermissions(ctx context.Context) ([]*entity.ManagePermission, error)
+	FindPermissionsByIds(ctx context.Context, ids []int64) ([]*entity.ManagePermission, error)
+	FindPermissionById(ctx context.Context, id int64) (*entity.ManagePermission, error)
+	CreatePermission(ctx context.Context, p *entity.ManagePermission) (int64, error)
+	UpdatePermission(ctx context.Context, p *entity.ManagePermission) error
+	DeletePermission(ctx context.Context, id int64) error
+	CountPermissionChildren(ctx context.Context, parentId int64) (int, error)
 }
