@@ -1,0 +1,20 @@
+# 总后台(控制面)配置 —— 本地文件 + env, 不依赖 Nacos 启动(控制面是配置写方)。
+server:
+  address:     ":8003"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+logger:
+  level:  "all"
+  stdout: true
+
+# 控制面独立库 my_manage
+database:
+  default:
+    link:  "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my_manage?sslmode=disable"
+    debug: true
+
+redis:
+  default:
+    address: "127.0.0.1:6379"
+    db:      1   # 与站点服务(db 0)隔离
