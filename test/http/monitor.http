@@ -1,0 +1,145 @@
+###############################################################################
+# 总后台 M5 · 监控/汇总 真实端到端测试(:8003)
+# 流程: 建站并按开站清单上线 -> health -> overview(应含该站与真实指标) -> logs -> 归档
+# 前置: MANAGE_SECRET / Nacos / my_service 库 与 provision.http 相同
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8003
+
+### 1. 登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("mToken", response.body.data.token);
+client.global.set("selfId", response.body.data.admin.id);
+%}
+
+### 2. 建商户
+POST {{baseUrl}}/manage/merchants
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "E2E监控商户-{{$timestamp}}" }
+
+> {%
+client.global.set("mid", response.body.data.id);
+%}
+
+### 3. 建站点(真实 my_service 库)
+POST {{baseUrl}}/manage/sites
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{
+  "merchant_id": {{mid}},
+  "site_code": "mon{{$timestamp}}",
+  "name": "E2E监控站",
+  "env": "dev",
+  "db_host": "127.0.0.1", "db_port": 5432,
+  "db_name": "my_service", "db_user": "postgres", "db_pass": "654321"
+}
+
+> {%
+client.global.set("sid", response.body.data.id);
+%}
+
+### 4. 站点健康 —— DB 可连、迁移版本>0
+GET {{baseUrl}}/manage/sites/{{sid}}/health
+Authorization: {{mToken}}
+
+> {%
+client.test("健康检查正常", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var d = response.body.data;
+    client.assert(d.db_ok === true, "DB 应可连: " + d.message);
+    client.assert(d.goose_version > 0, "迁移版本应>0: " + d.goose_version);
+});
+%}
+
+### 5. 补齐清单并上线: 绑域名
+POST {{baseUrl}}/manage/sites/{{sid}}/domains
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "domain": "mon-{{$timestamp}}.example.com", "https": 1 }
+
+### 6. 发布配置
+POST {{baseUrl}}/manage/sites/{{sid}}/config/publish
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "content": "server:\n  address: \":8001\"\n", "remark": "监控测试" }
+
+### 7. 上线
+POST {{baseUrl}}/manage/sites/{{sid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("上线成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 8. 跨站汇总 —— 应含该站且指标为真实数据
+GET {{baseUrl}}/manage/overview
+Authorization: {{mToken}}
+
+> {%
+client.test("汇总正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var d = response.body.data;
+    client.assert(d.site_count >= 1, "上线站点数应>=1");
+    var mine = d.sites.find(function (x) { return x.site_id === client.global.get("sid"); });
+    client.assert(mine, "汇总应包含新站点");
+    client.assert(mine.ok === true, "采集应成功: " + mine.error);
+    client.assert(mine.user_count >= 1, "my_service 库用户数应>=1");
+    client.assert(d.user_count >= mine.user_count, "总汇总应>=单站");
+});
+%}
+
+### 9. 审计日志 —— 本管理员有写操作记录, 且带用户名
+GET {{baseUrl}}/manage/logs?admin_id={{selfId}}&method=POST&page=1&size=10
+Authorization: {{mToken}}
+
+> {%
+client.test("审计日志正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应有操作记录");
+    var top = response.body.data.list[0];
+    client.assert(top.username === "admin", "应联表带出管理员名");
+    client.assert(top.method === "POST", "method 应为 POST");
+});
+%}
+
+### 10. 按路径关键字过滤日志
+GET {{baseUrl}}/manage/logs?keyword=/manage/sites
+Authorization: {{mToken}}
+
+> {%
+client.test("路径过滤命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应命中站点相关操作");
+});
+%}
+
+### 11. 清理: 停用站点(overview 不再统计)
+POST {{baseUrl}}/manage/sites/{{sid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 2 }
+
+> {%
+client.test("停用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

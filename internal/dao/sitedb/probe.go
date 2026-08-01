@@ -54,3 +54,48 @@ func GooseVersion(ctx context.Context, host string, port int, user, pass, dbname
 	}
 	return v.Int64(), nil
 }
+
+// Stats 站点库核心指标(M5 跨站汇总): 用户数/今日新增/今日活跃/累计充值。
+type Stats struct {
+	UserCount   int
+	TodayNew    int
+	TodayActive int
+	PaidAmount  float64
+	PaidOrders  int
+}
+
+// QueryStats 连站点库聚合核心指标。today 为 YYYYMMDD。
+func QueryStats(ctx context.Context, host string, port int, user, pass, dbname string, today int) (*Stats, error) {
+	node := gdb.ConfigNode{
+		Type: "pgsql", Host: host, Port: fmt.Sprintf("%d", port),
+		User: user, Pass: pass, Name: dbname, Extra: "sslmode=disable",
+	}
+	db, err := gdb.New(node)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close(ctx)
+
+	st := &Stats{}
+	one, err := db.GetOne(ctx, `
+		SELECT count(*)                                              AS total,
+		       count(*) FILTER (WHERE register_date = ?)             AS today_new,
+		       count(*) FILTER (WHERE last_login_at >= current_date) AS today_active
+		  FROM users`, today)
+	if err != nil {
+		return nil, err
+	}
+	st.UserCount = one["total"].Int()
+	st.TodayNew = one["today_new"].Int()
+	st.TodayActive = one["today_active"].Int()
+
+	one, err = db.GetOne(ctx, `
+		SELECT coalesce(sum(amount), 0) AS amt, count(*) AS cnt
+		  FROM recharge_order WHERE status = 1`)
+	if err != nil {
+		return nil, err
+	}
+	st.PaidAmount = one["amt"].Float64()
+	st.PaidOrders = one["cnt"].Int()
+	return st, nil
+}
