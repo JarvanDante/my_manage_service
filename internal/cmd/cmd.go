@@ -12,6 +12,7 @@ import (
 	authmod "github.com/JarvanDante/my_manage_service/internal/modules/auth"
 	merchmod "github.com/JarvanDante/my_manage_service/internal/modules/merchant"
 	sitemod "github.com/JarvanDante/my_manage_service/internal/modules/site"
+	scmod "github.com/JarvanDante/my_manage_service/internal/modules/siteconfig"
 	"github.com/JarvanDante/my_manage_service/internal/shared/middleware"
 )
 
@@ -37,6 +38,7 @@ var Main = gcmd.Command{
 				perm.Middleware(middleware.ManageAuth, middleware.ManagePerm, middleware.ManageOpLog)
 				merchmod.Register(perm, dao.NewMerchantRepo())
 				sitemod.Register(perm, dao.NewSiteRepo())
+				scmod.Register(perm, dao.NewSiteConfigRepo())
 			})
 		})
 

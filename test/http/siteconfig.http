@@ -1,0 +1,162 @@
+###############################################################################
+# 总后台 M3 · 配置发布/回滚 真实端到端测试(:8003)
+# 前置:
+#   1. config.yaml 的 nacospub.namespaces.dev 已填 dev 命名空间的 namespaceId
+#   2. Nacos 运行中; 服务已设 MANAGE_SECRET
+# 链路: 建站 -> 发布v1 -> 读取(脱敏+database注入) -> 发布v2 -> 历史 -> 回滚v1 -> 验证
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8003
+
+### 1. 登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("mToken", response.body.data.token);
+%}
+
+### 2. 建商户 + 站点(登记真实 my_service 库)
+POST {{baseUrl}}/manage/merchants
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "E2E配置商户-{{$timestamp}}" }
+
+> {%
+client.global.set("mid", response.body.data.id);
+%}
+
+### 3. 建站点
+POST {{baseUrl}}/manage/sites
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{
+  "merchant_id": {{mid}},
+  "site_code": "cfg{{$timestamp}}",
+  "name": "E2E配置站",
+  "env": "dev",
+  "db_host": "127.0.0.1", "db_port": 5432,
+  "db_name": "my_service", "db_user": "postgres", "db_pass": "654321"
+}
+
+> {%
+client.test("建站成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("sid", response.body.data.id);
+%}
+
+### 4. 发布 v1(注意: 不写 database 段, 发布时自动注入)
+POST {{baseUrl}}/manage/sites/{{sid}}/config/publish
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "content": "server:\n  address: \":8001\"\nmarker: v1\nlogger:\n  level: all\n", "remark": "首次发布" }
+
+> {%
+client.test("发布v1成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.version === 1, "版本应为 1");
+});
+%}
+
+### 5. 读取当前配置 —— database 已注入 + 密码脱敏 + marker=v1
+GET {{baseUrl}}/manage/sites/{{sid}}/config
+Authorization: {{mToken}}
+
+> {%
+client.test("当前配置正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var d = response.body.data;
+    client.assert(d.exists === true, "配置应存在");
+    client.assert(d.content.indexOf("marker: v1") >= 0, "应含 marker v1");
+    client.assert(d.content.indexOf("database") >= 0, "database 段应已注入");
+    client.assert(d.content.indexOf("******") >= 0, "DB密码应脱敏");
+    client.assert(d.content.indexOf("654321") < 0, "不应出现明文密码");
+});
+%}
+
+### 6. 发布 v2
+POST {{baseUrl}}/manage/sites/{{sid}}/config/publish
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "content": "server:\n  address: \":8001\"\nmarker: v2\nlogger:\n  level: all\n", "remark": "第二版" }
+
+> {%
+client.test("发布v2成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.version === 2, "版本应为 2");
+});
+%}
+
+### 7. 发布历史 —— 2 条且倒序, 原文不含数据库密码
+GET {{baseUrl}}/manage/sites/{{sid}}/config/history
+Authorization: {{mToken}}
+
+> {%
+client.test("历史正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total === 2, "应2条");
+    client.assert(response.body.data.list[0].version === 2, "第一条应为 v2");
+    client.assert(response.body.data.list[0].content.indexOf("654321") < 0, "历史原文不应含DB密码");
+});
+%}
+
+### 8. 回滚到 v1 —— 生成 v3
+POST {{baseUrl}}/manage/sites/{{sid}}/config/rollback
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "version": 1 }
+
+> {%
+client.test("回滚成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.version === 3, "回滚应生成 v3");
+});
+%}
+
+### 9. 当前配置应回到 v1 内容
+GET {{baseUrl}}/manage/sites/{{sid}}/config
+Authorization: {{mToken}}
+
+> {%
+client.test("回滚生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.content.indexOf("marker: v1") >= 0, "应回到 v1 内容");
+});
+%}
+
+### 10. 回滚到不存在的版本 —— 应被拒
+POST {{baseUrl}}/manage/sites/{{sid}}/config/rollback
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "version": 999 }
+
+> {%
+client.test("不存在版本被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 版本不存在");
+});
+%}
+
+### 11. 非法 YAML —— 应被拒
+POST {{baseUrl}}/manage/sites/{{sid}}/config/publish
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "content": "server: [unclosed" }
+
+> {%
+client.test("非法YAML被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 不是合法的 YAML");
+});
+%}
