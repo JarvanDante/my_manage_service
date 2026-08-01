@@ -37,6 +37,7 @@ var Main = gcmd.Command{
 			// 需权限校验: 业务接口(M1 商户起挂这里)
 			group.Group("/", func(perm *ghttp.RouterGroup) {
 				perm.Middleware(middleware.ManageAuth, middleware.ManagePerm, middleware.ManageOpLog)
+				authmod.RegisterPermManage(perm, dao.NewAuthRepo())
 				merchmod.Register(perm, dao.NewMerchantRepo())
 				sitemod.Register(perm, dao.NewSiteRepo())
 				scmod.Register(perm, dao.NewSiteConfigRepo())

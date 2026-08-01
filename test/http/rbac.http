@@ -1,0 +1,214 @@
+###############################################################################
+# 总后台 M6 · 角色/权限/账号 真实端到端测试(:8003)
+# 核心链路: 建角色(无权限) -> 建账号 -> 低权限登录 -> 被 ManagePerm 拦截
+#          -> 超管授权 GET 商户 -> 立即放行 -> 写操作仍被拒 -> 清理
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8003
+
+### 1. 超管登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("superToken", response.body.data.token);
+%}
+
+### 2. 创建运营角色 op(容错: 已存在则跳过)
+POST {{baseUrl}}/manage/roles
+Authorization: {{superToken}}
+Content-Type: application/json
+
+{ "name": "运营", "code": "op", "remark": "M6测试角色" }
+
+> {%
+client.test("创建角色", function () {
+    var ok = response.body.code === 0 || (response.body.message && response.body.message.indexOf("已存在") >= 0);
+    client.assert(ok, "应创建成功或已存在: " + response.body.message);
+});
+%}
+
+### 3. 角色列表 —— 取 op 的 id
+GET {{baseUrl}}/manage/roles
+Authorization: {{superToken}}
+
+> {%
+client.test("找到 op", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var op = response.body.data.list.find(function (r) { return r.code === "op"; });
+    client.assert(op, "应存在 op 角色");
+    client.global.set("opId", op.id);
+});
+%}
+
+### 4. 保留角色码 superadmin —— 应被拒
+POST {{baseUrl}}/manage/roles
+Authorization: {{superToken}}
+Content-Type: application/json
+
+{ "name": "假超管", "code": "superadmin" }
+
+> {%
+client.test("保留码被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 系统保留角色码");
+});
+%}
+
+### 5. 创建低权限管理员(时间戳账号, 可重复跑)
+POST {{baseUrl}}/manage/admins
+Authorization: {{superToken}}
+Content-Type: application/json
+
+{ "username": "op_{{$timestamp}}", "password": "op123456", "nickname": "运营小张", "role_id": {{opId}} }
+
+> {%
+client.test("创建管理员成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("opAdminId", response.body.data.id);
+%}
+
+### 6. 管理员列表 —— 命中且 role_name 回填
+GET {{baseUrl}}/manage/admins?page=1&size=50
+Authorization: {{superToken}}
+
+> {%
+client.test("列表命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var u = response.body.data.list.find(function (a) { return a.id === client.global.get("opAdminId"); });
+    client.assert(u, "应包含新管理员");
+    client.assert(u.role_name === "运营", "role_name 应为 运营");
+    client.global.set("opUsername", u.username);
+});
+%}
+
+### 7. 低权限账号登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "{{opUsername}}", "password": "op123456" }
+
+> {%
+client.test("op 登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("opToken", response.body.data.token);
+%}
+
+### 8. op 看自己信息 —— 仅登录组, 应放行
+GET {{baseUrl}}/manage/auth/info
+Authorization: {{opToken}}
+
+> {%
+client.test("自身信息放行", function () {
+    client.assert(response.body.code === 0, "auth/info 只需登录: " + response.body.message);
+});
+%}
+
+### 9. op 访问商户列表 —— 无策略, 应被 ManagePerm 拦截
+GET {{baseUrl}}/manage/merchants
+Authorization: {{opToken}}
+
+> {%
+client.test("无权限被拦", function () {
+    client.assert(response.body.code !== 0, "应报错: 无权限访问该资源");
+});
+%}
+
+### 10. 超管给 op 授权: GET /manage/merchants
+POST {{baseUrl}}/manage/roles/op/perms
+Authorization: {{superToken}}
+Content-Type: application/json
+
+{ "path": "/manage/merchants", "method": "GET" }
+
+> {%
+client.test("授权成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 11. op 再访问商户列表 —— 应立即放行(策略实时生效)
+GET {{baseUrl}}/manage/merchants
+Authorization: {{opToken}}
+
+> {%
+client.test("授权后放行", function () {
+    client.assert(response.body.code === 0, "应放行: " + response.body.message);
+});
+%}
+
+### 12. op 创建商户 —— 只授了 GET, POST 应仍被拒
+POST {{baseUrl}}/manage/merchants
+Authorization: {{opToken}}
+Content-Type: application/json
+
+{ "name": "越权商户-{{$timestamp}}" }
+
+> {%
+client.test("写操作仍被拒", function () {
+    client.assert(response.body.code !== 0, "POST 未授权应被拒");
+});
+%}
+
+### 13. 权限列表确认
+GET {{baseUrl}}/manage/roles/op/perms
+Authorization: {{superToken}}
+
+> {%
+client.test("权限列表正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (p) {
+        return p.path === "/manage/merchants" && p.method === "GET";
+    });
+    client.assert(hit, "应包含 GET /manage/merchants");
+});
+%}
+
+### 14. 清理: 删除权限
+DELETE {{baseUrl}}/manage/roles/op/perms
+Authorization: {{superToken}}
+Content-Type: application/json
+
+{ "path": "/manage/merchants", "method": "GET" }
+
+> {%
+client.test("删除权限成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 15. 有管理员时删角色 —— 应被拒
+DELETE {{baseUrl}}/manage/roles/{{opId}}
+Authorization: {{superToken}}
+
+> {%
+client.test("有账号时删角色被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 该角色下仍有管理员");
+});
+%}
+
+### 16. 清理: 删除 op 管理员
+DELETE {{baseUrl}}/manage/admins/{{opAdminId}}
+Authorization: {{superToken}}
+
+> {%
+client.test("删除管理员成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 17. 清理: 删除 op 角色(此时无账号)
+DELETE {{baseUrl}}/manage/roles/{{opId}}
+Authorization: {{superToken}}
+
+> {%
+client.test("删除角色成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
