@@ -155,14 +155,28 @@ func (s *sSite) Update(ctx context.Context, in service.SaveInput) error {
 	})
 }
 
-// SetStatus 0筹备 1上线 2停用。
-// TODO(M4): status→1 前走 provision-check 清单(域名/DB/迁移/配置全过才放行)。
+// SetStatus 0筹备 1上线 2停用。status→1 必须通过开站清单(M4 状态机门禁)。
 func (s *sSite) SetStatus(ctx context.Context, id int64, status int) error {
 	if status < 0 || status > 2 {
 		return gerror.New("status 仅支持 0/1/2")
 	}
 	if _, err := s.mustSite(ctx, id); err != nil {
 		return err
+	}
+	if status == 1 {
+		check, err := s.ProvisionCheck(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !check.AllPassed {
+			failed := make([]string, 0)
+			for _, it := range check.Items {
+				if !it.Ok {
+					failed = append(failed, it.Name)
+				}
+			}
+			return gerror.Newf("开站清单未通过, 不能上线: %s", strings.Join(failed, "、"))
+		}
 	}
 	return s.repo.SetStatus(ctx, id, status)
 }

@@ -134,3 +134,21 @@ type DomainMainReq struct {
 	DomainId int64 `json:"domainId" v:"required|min:1#域名ID必填|域名ID必须大于0"`
 }
 type DomainMainRes struct{}
+
+// ---------- 开站清单(M4) ----------
+
+type ProvisionItem struct {
+	Key    string `json:"key"` // merchant / domain / db / migration / config
+	Name   string `json:"name"`
+	Ok     bool   `json:"ok"`
+	Detail string `json:"detail"`
+}
+
+type ProvisionCheckReq struct {
+	g.Meta `path:"/sites/{id}/provision-check" method:"post" tags:"Manage/Site" summary:"开站清单校验(全过才可上线)"`
+	Id     int64 `json:"id" v:"required|min:1#站点ID必填|站点ID必须大于0"`
+}
+type ProvisionCheckRes struct {
+	AllPassed bool            `json:"all_passed"`
+	Items     []ProvisionItem `json:"items"`
+}

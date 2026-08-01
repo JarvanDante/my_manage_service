@@ -13,7 +13,7 @@ import (
 func Register(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := controller.New(logic.New(repo))
 	group.Bind(
-		ctrl.List, ctrl.Detail, ctrl.Create, ctrl.Update, ctrl.Status, ctrl.DbCheck,
+		ctrl.List, ctrl.Detail, ctrl.Create, ctrl.Update, ctrl.Status, ctrl.DbCheck, ctrl.ProvisionCheck,
 		ctrl.DomainBind, ctrl.DomainUnbind, ctrl.DomainMain,
 	)
 }

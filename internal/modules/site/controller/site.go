@@ -118,3 +118,16 @@ func toItem(s *service.SiteDTO) v1.SiteItem {
 		DbPass: s.DbPassMask, Remark: s.Remark, CreatedAt: s.CreatedAt,
 	}
 }
+
+// ProvisionCheck 开站清单校验(M4)。
+func (c *Controller) ProvisionCheck(ctx context.Context, req *v1.ProvisionCheckReq) (res *v1.ProvisionCheckRes, err error) {
+	d, err := c.site.ProvisionCheck(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.ProvisionItem, 0, len(d.Items))
+	for _, it := range d.Items {
+		items = append(items, v1.ProvisionItem{Key: it.Key, Name: it.Name, Ok: it.Ok, Detail: it.Detail})
+	}
+	return &v1.ProvisionCheckRes{AllPassed: d.AllPassed, Items: items}, nil
+}

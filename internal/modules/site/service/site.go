@@ -63,6 +63,18 @@ type SaveInput struct {
 	Remark     string
 }
 
+type ProvisionItemDTO struct {
+	Key    string // merchant / domain / db / migration / config
+	Name   string
+	Ok     bool
+	Detail string
+}
+
+type ProvisionDTO struct {
+	AllPassed bool
+	Items     []*ProvisionItemDTO
+}
+
 type DbCheckDTO struct {
 	Ok        bool
 	LatencyMs int64
@@ -76,6 +88,7 @@ type ISite interface {
 	Update(ctx context.Context, in SaveInput) error
 	SetStatus(ctx context.Context, id int64, status int) error
 	DbCheck(ctx context.Context, id int64) (*DbCheckDTO, error)
+	ProvisionCheck(ctx context.Context, id int64) (*ProvisionDTO, error)
 
 	BindDomain(ctx context.Context, siteId int64, domain string, https int) (int64, error)
 	UnbindDomain(ctx context.Context, siteId, domainId int64) error

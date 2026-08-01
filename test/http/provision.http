@@ -1,0 +1,160 @@
+###############################################################################
+# 总后台 M4 · 开站清单 真实端到端测试(:8003)
+# 流程: 建站(缺域名缺配置) -> 清单部分失败 -> 上线被拒 -> 补齐 -> 全绿 -> 上线成功
+# 前置: MANAGE_SECRET 已设; Nacos 运行中; nacospub.namespaces.dev 已配置
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8003
+
+### 1. 登录
+POST {{baseUrl}}/manage/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("mToken", response.body.data.token);
+%}
+
+### 2. 建商户
+POST {{baseUrl}}/manage/merchants
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "name": "E2E开站商户-{{$timestamp}}" }
+
+> {%
+client.global.set("mid", response.body.data.id);
+%}
+
+### 3. 建站点(登记真实 my_service 库; 先不绑域名不发配置)
+POST {{baseUrl}}/manage/sites
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{
+  "merchant_id": {{mid}},
+  "site_code": "prv{{$timestamp}}",
+  "name": "E2E开站测试站",
+  "env": "dev",
+  "db_host": "127.0.0.1", "db_port": 5432,
+  "db_name": "my_service", "db_user": "postgres", "db_pass": "654321"
+}
+
+> {%
+client.test("建站成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("sid", response.body.data.id);
+%}
+
+### 4. 开站清单 —— 应部分失败: 商户/DB/迁移 过, 域名/配置 不过
+POST {{baseUrl}}/manage/sites/{{sid}}/provision-check
+Authorization: {{mToken}}
+
+> {%
+client.test("清单部分失败", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var d = response.body.data;
+    client.assert(d.all_passed === false, "整体应未通过");
+    function item(k) { return d.items.find(function (x) { return x.key === k; }); }
+    client.assert(item("merchant").ok === true, "商户应通过");
+    client.assert(item("db").ok === true, "DB应通过: " + item("db").detail);
+    client.assert(item("migration").ok === true, "迁移应通过: " + item("migration").detail);
+    client.assert(item("domain").ok === false, "域名应不通过");
+    client.assert(item("config").ok === false, "配置应不通过");
+});
+%}
+
+### 5. 直接上线 —— 应被门禁拒绝
+POST {{baseUrl}}/manage/sites/{{sid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("清单不过不能上线", function () {
+    client.assert(response.body.code !== 0, "应报错: 开站清单未通过");
+    client.assert(response.body.message.indexOf("清单未通过") >= 0, "错误信息应含清单项: " + response.body.message);
+});
+%}
+
+### 6. 补齐: 绑定域名
+POST {{baseUrl}}/manage/sites/{{sid}}/domains
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "domain": "prv-{{$timestamp}}.example.com", "https": 1 }
+
+> {%
+client.test("绑定域名成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 7. 补齐: 发布配置
+POST {{baseUrl}}/manage/sites/{{sid}}/config/publish
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "content": "server:\n  address: \":8001\"\nlogger:\n  level: all\n", "remark": "开站首发" }
+
+> {%
+client.test("发布配置成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 8. 再跑清单 —— 五项全绿
+POST {{baseUrl}}/manage/sites/{{sid}}/provision-check
+Authorization: {{mToken}}
+
+> {%
+client.test("清单全绿", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var d = response.body.data;
+    client.assert(d.all_passed === true, "应全部通过: " + JSON.stringify(d.items));
+    client.assert(d.items.length === 5, "应5项");
+});
+%}
+
+### 9. 上线 —— 成功
+POST {{baseUrl}}/manage/sites/{{sid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("上线成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 详情确认已上线
+GET {{baseUrl}}/manage/sites/{{sid}}
+Authorization: {{mToken}}
+
+> {%
+client.test("状态=1上线", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.status === 1, "status 应为 1");
+});
+%}
+
+### 11. 清理: 停用站点(测试数据归档)
+POST {{baseUrl}}/manage/sites/{{sid}}/status
+Authorization: {{mToken}}
+Content-Type: application/json
+
+{ "status": 2 }
+
+> {%
+client.test("停用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
