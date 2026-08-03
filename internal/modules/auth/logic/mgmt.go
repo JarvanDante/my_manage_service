@@ -4,13 +4,12 @@ package logic
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/crypto/gmd5"
 	"github.com/gogf/gf/v2/errors/gerror"
-	"github.com/gogf/gf/v2/util/grand"
 
 	"github.com/JarvanDante/my_manage_service/internal/model/entity"
 	"github.com/JarvanDante/my_manage_service/internal/modules/auth/service"
 	"github.com/JarvanDante/my_manage_service/internal/shared/consts"
+	"github.com/JarvanDante/my_manage_service/internal/shared/kit"
 )
 
 // ---------- 角色 ----------
@@ -130,10 +129,12 @@ func (s *sAuth) CreateAdmin(ctx context.Context, in service.AdminCreateInput) (i
 	if _, err = s.mustRole(ctx, in.RoleId); err != nil {
 		return 0, err
 	}
-	salt := grand.S(8)
-	pwd := gmd5.MustEncryptString(in.Password + salt)
+	pwd, err := kit.HashPassword(in.Password)
+	if err != nil {
+		return 0, err
+	}
 	return s.repo.CreateAdmin(ctx, &entity.ManageAdmin{
-		Username: in.Username, Password: pwd, Salt: salt, Nickname: in.Nickname, RoleId: in.RoleId,
+		Username: in.Username, Password: pwd, Nickname: in.Nickname, RoleId: in.RoleId,
 	})
 }
 
@@ -151,12 +152,14 @@ func (s *sAuth) UpdateAdmin(ctx context.Context, in service.AdminUpdateInput) er
 	if _, err = s.mustRole(ctx, in.RoleId); err != nil {
 		return err
 	}
-	var pwd, salt string
+	var pwd string
 	if in.Password != "" {
-		salt = grand.S(8)
-		pwd = gmd5.MustEncryptString(in.Password + salt)
+		pwd, err = kit.HashPassword(in.Password)
+		if err != nil {
+			return err
+		}
 	}
-	return s.repo.UpdateAdmin(ctx, in.Id, in.Nickname, in.RoleId, in.Status, pwd, salt)
+	return s.repo.UpdateAdmin(ctx, in.Id, in.Nickname, in.RoleId, in.Status, pwd)
 }
 
 func (s *sAuth) DeleteAdmin(ctx context.Context, id, operatorId int64) error {

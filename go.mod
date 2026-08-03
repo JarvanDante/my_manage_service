@@ -9,6 +9,7 @@ require (
 	github.com/gogf/gf/contrib/nosql/redis/v2 v2.10.2
 	github.com/gogf/gf/v2 v2.10.2
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.3
+	golang.org/x/crypto v0.38.0
 )
 
 require (
@@ -82,7 +83,6 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect

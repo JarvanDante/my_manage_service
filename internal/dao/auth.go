@@ -96,7 +96,7 @@ func (r *authRepo) ListAdmins(ctx context.Context, page, size int) ([]*entity.Ma
 
 func (r *authRepo) CreateAdmin(ctx context.Context, a *entity.ManageAdmin) (int64, error) {
 	res, err := g.Model("manage_admin").Ctx(ctx).Data(g.Map{
-		"username": a.Username, "password": a.Password, "salt": a.Salt,
+		"username": a.Username, "password": a.Password, "salt": "",
 		"nickname": a.Nickname, "role_id": a.RoleId, "status": 1,
 	}).Insert()
 	if err != nil {
@@ -105,13 +105,13 @@ func (r *authRepo) CreateAdmin(ctx context.Context, a *entity.ManageAdmin) (int6
 	return res.LastInsertId()
 }
 
-func (r *authRepo) UpdateAdmin(ctx context.Context, id int64, nickname string, roleId int64, status int, password, salt string) error {
+func (r *authRepo) UpdateAdmin(ctx context.Context, id int64, nickname string, roleId int64, status int, password string) error {
 	data := g.Map{
 		"nickname": nickname, "role_id": roleId, "status": status, "updated_at": gtime.Now(),
 	}
 	if password != "" {
 		data["password"] = password
-		data["salt"] = salt
+		data["salt"] = "" // bcrypt 盐内嵌于哈希, 旧 salt 字段清空
 	}
 	_, err := g.Model("manage_admin").Ctx(ctx).Where("id", id).Data(data).Update()
 	return err

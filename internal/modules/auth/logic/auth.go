@@ -4,7 +4,6 @@ package logic
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/crypto/gmd5"
 	"github.com/gogf/gf/v2/errors/gerror"
 
 	"github.com/JarvanDante/my_manage_service/internal/model/entity"
@@ -33,7 +32,7 @@ func (s *sAuth) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 	if a.Status != 1 {
 		return nil, gerror.New("账号已被禁用")
 	}
-	if gmd5.MustEncryptString(in.Password+a.Salt) != a.Password {
+	if !kit.CheckPassword(in.Password, a.Password) {
 		return nil, gerror.New("账号或密码错误")
 	}
 	_ = s.repo.UpdateLoginInfo(ctx, a.Id, in.Ip)

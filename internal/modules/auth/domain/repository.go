@@ -25,7 +25,7 @@ type Repository interface {
 	// 管理员账号(M6)
 	ListAdmins(ctx context.Context, page, size int) ([]*entity.ManageAdmin, int, error)
 	CreateAdmin(ctx context.Context, a *entity.ManageAdmin) (int64, error)
-	UpdateAdmin(ctx context.Context, id int64, nickname string, roleId int64, status int, password, salt string) error
+	UpdateAdmin(ctx context.Context, id int64, nickname string, roleId int64, status int, password string) error
 	DeleteAdmin(ctx context.Context, id int64) error
 
 	// 权限树(RBAC 菜单+接口权限)
