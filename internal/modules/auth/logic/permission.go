@@ -158,9 +158,10 @@ func buildMenuTree(menus []*entity.ManagePermission) []*service.MenuNodeDTO {
 			roots = append(roots, node)
 		}
 	}
-	// 有子节点的父级: 默认重定向到第一个子节点
+	// 纯目录(自身无 component)才重定向到首个子菜单;
+	// 已有页面组件的父级(如站点列表挂隐藏详情)不能 redirect, 否则点菜单会进无参详情页。
 	for _, n := range nodeMap {
-		if len(n.Children) > 0 {
+		if len(n.Children) > 0 && n.Component == "" {
 			n.Redirect = n.Children[0].Path
 		}
 	}
