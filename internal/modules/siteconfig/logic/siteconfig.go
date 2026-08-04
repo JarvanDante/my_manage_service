@@ -2,7 +2,7 @@
 //
 // 关键设计:
 //   - 发布记录存"未注入 database 段"的原文 —— 库里不落站点DB明文密码;
-//   - 发布/回滚时动态注入: 用站点登记信息(AES解密)渲染 database.default.link;
+//   - 发布/回滚时保留原文; 仅覆盖 database.default.link 为站点登记库连接;
 //   - 查看当前配置时对 link 里的密码脱敏。
 package logic
 
@@ -10,6 +10,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -22,7 +24,11 @@ import (
 	"github.com/JarvanDante/my_manage_service/internal/shared/nacospub"
 )
 
-var passMaskRe = regexp.MustCompile(`(pgsql:[^:@]+:)[^@]+(@)`)
+var (
+	passMaskRe = regexp.MustCompile(`(pgsql:[^:@]+:)[^@]+(@)`)
+	linkLineRe = regexp.MustCompile(`^([ \t]*)link\s*:.*$`)
+	defaultRe  = regexp.MustCompile(`^([ \t]*)default\s*:\s*(#.*)?$`)
+)
 
 type sSiteConfig struct {
 	repo domain.Repository
@@ -118,10 +124,12 @@ func (s *sSiteConfig) doPublish(ctx context.Context, siteId int64, content strin
 	return &service.PublishDTO{Version: version, DataId: dataId}, nil
 }
 
-// injectDatabase 解析 yaml 并注入 database.default.link(覆盖同名段)。
+// injectDatabase 校验 YAML 合法后, 全文文本级处理:
+//   - 其它段落原样保留;
+//   - 若已有 database 段: 只改/补 default.link, debug 等字段一字不动;
+//   - 若无 database 段: 末尾追加仅含 link 的 database 段。
 func injectDatabase(ctx context.Context, content string, site *entity.Site) (string, error) {
-	j, err := gjson.LoadContentType(gjson.ContentTypeYaml, []byte(content))
-	if err != nil {
+	if _, err := gjson.LoadContentType(gjson.ContentTypeYaml, []byte(content)); err != nil {
 		return "", gerror.Wrap(err, "配置内容不是合法的 YAML")
 	}
 	pass, err := kit.Decrypt(site.DbPass)
@@ -130,14 +138,122 @@ func injectDatabase(ctx context.Context, content string, site *entity.Site) (str
 	}
 	link := fmt.Sprintf("pgsql:%s:%s@tcp(%s:%d)/%s?sslmode=disable",
 		site.DbUser, pass, site.DbHost, site.DbPort, site.DbName)
-	if err = j.Set("database.default.link", link); err != nil {
-		return "", err
+
+	if strings.TrimSpace(extractTopLevelYAMLBlock(content, "database")) != "" {
+		return replaceOrInsertDatabaseLink(content, link), nil
 	}
-	out, err := j.ToYamlString()
-	if err != nil {
-		return "", gerror.Wrap(err, "生成 YAML 失败")
+	dbBlock := "database:\n  default:\n    link: " + strconv.Quote(link) + "\n"
+	body := strings.TrimRight(content, "\n")
+	if body == "" {
+		return dbBlock, nil
 	}
-	return out, nil
+	return body + "\n\n" + dbBlock, nil
+}
+
+// replaceOrInsertDatabaseLink 在原文 database 段内替换或插入 link 行, 其它行保持不变。
+func replaceOrInsertDatabaseLink(content, link string) string {
+	quoted := strconv.Quote(link)
+	block := extractTopLevelYAMLBlock(content, "database")
+	rest := strings.TrimRight(removeTopLevelYAMLKey(content, "database"), "\n")
+
+	lines := strings.Split(block, "\n")
+	replaced := false
+	for i, line := range lines {
+		if m := linkLineRe.FindStringSubmatch(line); m != nil {
+			lines[i] = m[1] + "link: " + quoted
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		out := make([]string, 0, len(lines)+2)
+		inserted := false
+		for _, line := range lines {
+			out = append(out, line)
+			if m := defaultRe.FindStringSubmatch(line); m != nil {
+				out = append(out, m[1]+"  link: "+quoted)
+				inserted = true
+			}
+		}
+		if !inserted {
+			out = append(out, "  default:", "    link: "+quoted)
+		}
+		lines = out
+	}
+	newBlock := strings.Join(lines, "\n")
+	if rest == "" {
+		return newBlock
+	}
+	return rest + "\n\n" + newBlock
+}
+
+// extractTopLevelYAMLBlock 取出顶层 key 整块文本(含 key 行)。
+func extractTopLevelYAMLBlock(content, key string) string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0)
+	capturing := false
+	for _, line := range lines {
+		if isYAMLTopLevelKeyLine(line) {
+			name, ok := yamlTopLevelKeyName(line)
+			if ok && name == key {
+				capturing = true
+				out = append(out, line)
+				continue
+			}
+			if capturing {
+				break
+			}
+		}
+		if capturing {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// removeTopLevelYAMLKey 删除顶层 key 整块(含其缩进子行), 其它文本原样保留。
+func removeTopLevelYAMLKey(content, key string) string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0, len(lines))
+	skipping := false
+	for _, line := range lines {
+		if isYAMLTopLevelKeyLine(line) {
+			name, ok := yamlTopLevelKeyName(line)
+			if ok && name == key {
+				skipping = true
+				continue
+			}
+			skipping = false
+		}
+		if skipping {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+func isYAMLTopLevelKeyLine(line string) bool {
+	if line == "" {
+		return false
+	}
+	if line[0] == ' ' || line[0] == '\t' || line[0] == '#' {
+		return false
+	}
+	return strings.Contains(line, ":")
+}
+
+func yamlTopLevelKeyName(line string) (string, bool) {
+	// 形如 "database:" / "database: something" / "database: # cmt"
+	i := strings.Index(line, ":")
+	if i <= 0 {
+		return "", false
+	}
+	name := strings.TrimSpace(line[:i])
+	if name == "" || strings.ContainsAny(name, " \t") {
+		return "", false
+	}
+	return name, true
 }
 
 // ---------- helpers ----------
