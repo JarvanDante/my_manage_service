@@ -18,8 +18,9 @@ import (
 
 var (
 	// site_code: 2~32 位大写英文字母, 不含数字与特殊符号
-	codeRe   = regexp.MustCompile(`^[A-Z]{2,32}$`)
-	domainRe = regexp.MustCompile(`^([a-z0-9-]+\.)+[a-z]{2,}$`)
+	codeRe = regexp.MustCompile(`^[A-Z]{2,32}$`)
+	// 正式域名 / localhost / 127.0.0.1, 均可带端口(本地调试)
+	domainRe = regexp.MustCompile(`^(?:(?:[a-z0-9-]+\.)+[a-z]{2,}|localhost|127\.0\.0\.1)(?::\d{1,5})?$`)
 )
 
 type sSite struct {
@@ -209,13 +210,45 @@ func (s *sSite) DbCheck(ctx context.Context, id int64) (*service.DbCheckDTO, err
 
 // ---------- 域名 ----------
 
+func normalizeDomain(raw string) string {
+	d := strings.ToLower(strings.TrimSpace(raw))
+	d = strings.TrimPrefix(d, "https://")
+	d = strings.TrimPrefix(d, "http://")
+	d = strings.TrimSuffix(d, "/")
+	return d
+}
+
+func validDomain(domainName string) bool {
+	if !domainRe.MatchString(domainName) {
+		return false
+	}
+	if i := strings.LastIndex(domainName, ":"); i >= 0 {
+		// 排除 IPv6 误伤后, 校验端口范围
+		port := domainName[i+1:]
+		n := 0
+		for _, c := range port {
+			if c < '0' || c > '9' {
+				return false
+			}
+			n = n*10 + int(c-'0')
+			if n > 65535 {
+				return false
+			}
+		}
+		if n < 1 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *sSite) BindDomain(ctx context.Context, siteId int64, domainName string, https int) (int64, error) {
 	if _, err := s.mustSite(ctx, siteId); err != nil {
 		return 0, err
 	}
-	domainName = strings.ToLower(strings.TrimSpace(domainName))
-	if !domainRe.MatchString(domainName) {
-		return 0, gerror.New("域名格式不正确")
+	domainName = normalizeDomain(domainName)
+	if !validDomain(domainName) {
+		return 0, gerror.New("域名格式不正确(支持 example.com / localhost:5779 / 127.0.0.1:8000)")
 	}
 	exist, err := s.repo.FindDomain(ctx, domainName)
 	if err != nil {
