@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	codeRe   = regexp.MustCompile(`^[a-z][a-z0-9]{1,31}$`)
+	// site_code: 2~32 位大写英文字母, 不含数字与特殊符号
+	codeRe   = regexp.MustCompile(`^[A-Z]{2,32}$`)
 	domainRe = regexp.MustCompile(`^([a-z0-9-]+\.)+[a-z]{2,}$`)
 )
 
@@ -50,9 +51,15 @@ func (s *sSite) List(ctx context.Context, in service.ListInput) (*service.ListDT
 }
 
 func (s *sSite) Detail(ctx context.Context, id int64) (*service.SiteDetailDTO, error) {
-	site, err := s.mustSite(ctx, id)
+	if id <= 0 {
+		return nil, gerror.New("站点ID无效")
+	}
+	item, err := s.repo.FindItemById(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if item == nil {
+		return nil, gerror.New("站点不存在")
 	}
 	domains, err := s.repo.Domains(ctx, id)
 	if err != nil {
@@ -64,7 +71,9 @@ func (s *sSite) Detail(ctx context.Context, id int64) (*service.SiteDetailDTO, e
 			Id: d.Id, Domain: d.Domain, IsMain: d.IsMain, Https: d.Https, Status: d.Status,
 		})
 	}
-	return &service.SiteDetailDTO{SiteDTO: *toDTO(site), Domains: ds}, nil
+	dto := toDTO(&item.Site)
+	dto.MerchantName = item.MerchantName
+	return &service.SiteDetailDTO{SiteDTO: *dto, Domains: ds}, nil
 }
 
 func checkSave(in service.SaveInput) error {
@@ -84,9 +93,9 @@ func checkSave(in service.SaveInput) error {
 }
 
 func (s *sSite) Create(ctx context.Context, in service.SaveInput) (int64, error) {
-	in.SiteCode = strings.ToLower(strings.TrimSpace(in.SiteCode))
+	in.SiteCode = strings.ToUpper(strings.TrimSpace(in.SiteCode))
 	if !codeRe.MatchString(in.SiteCode) {
-		return 0, gerror.New("site_code 须为 2~32 位小写字母开头的字母数字")
+		return 0, gerror.New("site_code 须为 2~32 位大写英文字母(不含数字与特殊符号)")
 	}
 	if err := checkSave(in); err != nil {
 		return 0, err

@@ -24,6 +24,7 @@ type SiteItem struct {
 type Repository interface {
 	List(ctx context.Context, f Filter, page, size int) ([]*SiteItem, int, error)
 	FindById(ctx context.Context, id int64) (*entity.Site, error)
+	FindItemById(ctx context.Context, id int64) (*SiteItem, error)
 	FindByCode(ctx context.Context, code string) (*entity.Site, error)
 	Create(ctx context.Context, s *entity.Site) (int64, error)
 	Update(ctx context.Context, s *entity.Site) error

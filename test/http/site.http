@@ -1,7 +1,7 @@
 ###############################################################################
 # 总后台 M2 · 站点管理 + 域名分配 真实端到端测试(:8003)
 # 前置: 服务启动时已设置 MANAGE_SECRET(AES 密钥); db-check 用真实的 my_service 库信息
-# site_code / 域名带时间戳, 可重复运行
+# site_code 为 2~32 位大写字母(脚本由时间戳转字母保证可重复跑)
 ###############################################################################
 
 @baseUrl = http://127.0.0.1:8003
@@ -17,6 +17,10 @@ client.test("登录成功", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
 });
 client.global.set("mToken", response.body.data.token);
+var n = Date.now();
+var s = "";
+while (n > 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
+client.global.set("scode", "E" + s);
 %}
 
 ### 2. 建测试商户
@@ -40,7 +44,7 @@ Content-Type: application/json
 
 {
   "merchant_id": {{mid}},
-  "site_code": "e2e{{$timestamp}}",
+  "site_code": "{{scode}}",
   "name": "E2E测试站",
   "env": "dev",
   "db_host": "127.0.0.1",

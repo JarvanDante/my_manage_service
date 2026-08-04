@@ -19,6 +19,10 @@ client.test("登录成功", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
 });
 client.global.set("mToken", response.body.data.token);
+var n = Date.now();
+var s = "";
+while (n > 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
+client.global.set("scode", "CFG" + s);
 %}
 
 ### 2. 建商户 + 站点(登记真实 my_service 库)
@@ -39,7 +43,7 @@ Content-Type: application/json
 
 {
   "merchant_id": {{mid}},
-  "site_code": "cfg{{$timestamp}}",
+  "site_code": "{{scode}}",
   "name": "E2E配置站",
   "env": "dev",
   "db_host": "127.0.0.1", "db_port": 5432,

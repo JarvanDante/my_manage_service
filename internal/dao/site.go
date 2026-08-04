@@ -49,6 +49,16 @@ func (r *siteRepo) FindById(ctx context.Context, id int64) (*entity.Site, error)
 	return s, err
 }
 
+// FindItemById 详情用: 联表商户名。
+func (r *siteRepo) FindItemById(ctx context.Context, id int64) (*sitedomain.SiteItem, error) {
+	var item *sitedomain.SiteItem
+	err := g.Model("site s").Ctx(ctx).
+		LeftJoin("merchant mc", "mc.id=s.merchant_id").
+		Fields("s.*, mc.name AS merchant_name").
+		Where("s.id", id).Scan(&item)
+	return item, err
+}
+
 func (r *siteRepo) FindByCode(ctx context.Context, code string) (*entity.Site, error) {
 	var s *entity.Site
 	err := g.Model("site").Ctx(ctx).Where("site_code", code).Scan(&s)

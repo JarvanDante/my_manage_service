@@ -18,6 +18,10 @@ client.test("登录成功", function () {
 });
 client.global.set("mToken", response.body.data.token);
 client.global.set("selfId", response.body.data.admin.id);
+var n = Date.now();
+var s = "";
+while (n > 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
+client.global.set("scode", "MON" + s);
 %}
 
 ### 2. 建商户
@@ -38,7 +42,7 @@ Content-Type: application/json
 
 {
   "merchant_id": {{mid}},
-  "site_code": "mon{{$timestamp}}",
+  "site_code": "{{scode}}",
   "name": "E2E监控站",
   "env": "dev",
   "db_host": "127.0.0.1", "db_port": 5432,

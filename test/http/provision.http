@@ -17,6 +17,10 @@ client.test("登录成功", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
 });
 client.global.set("mToken", response.body.data.token);
+var n = Date.now();
+var s = "";
+while (n > 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
+client.global.set("scode", "PRV" + s);
 %}
 
 ### 2. 建商户
@@ -37,7 +41,7 @@ Content-Type: application/json
 
 {
   "merchant_id": {{mid}},
-  "site_code": "prv{{$timestamp}}",
+  "site_code": "{{scode}}",
   "name": "E2E开站测试站",
   "env": "dev",
   "db_host": "127.0.0.1", "db_port": 5432,
