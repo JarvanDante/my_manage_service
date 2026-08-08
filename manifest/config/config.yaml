@@ -33,3 +33,10 @@ nacospub:
 # 开站清单(M4)
 provision:
   gooseVersion: 0   # 站点库期望迁移版本; 0=只要求已跑过迁移。my_service 发新迁移后手动更新(当前最新为 10)。
+
+# 媒资中心凭证同步(开站/重置 secret 时 PUT /admin/clients；关闭则跳过)
+paas:
+  media:
+    enabled: true
+    base_url: "http://127.0.0.1:8004"
+    admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
