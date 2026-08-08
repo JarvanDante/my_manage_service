@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	passMaskRe = regexp.MustCompile(`(pgsql:[^:@]+:)[^@]+(@)`)
-	linkLineRe = regexp.MustCompile(`^([ \t]*)link\s*:.*$`)
-	defaultRe  = regexp.MustCompile(`^([ \t]*)default\s*:\s*(#.*)?$`)
+	passMaskRe      = regexp.MustCompile(`(pgsql:[^:@]+:)[^@]+(@)`)
+	appSecretMaskRe = regexp.MustCompile(`(?m)^([ \t]*app_secret\s*:\s*).+$`)
+	linkLineRe      = regexp.MustCompile(`^([ \t]*)link\s*:.*$`)
+	defaultRe       = regexp.MustCompile(`^([ \t]*)default\s*:\s*(#.*)?$`)
 )
 
 type sSiteConfig struct {
@@ -45,10 +46,12 @@ func (s *sSiteConfig) Current(ctx context.Context, siteId int64) (*service.Curre
 	if err != nil {
 		return nil, err
 	}
+	masked := passMaskRe.ReplaceAllString(content, "${1}******${2}")
+	masked = appSecretMaskRe.ReplaceAllString(masked, `${1}"******"`)
 	return &service.CurrentConfigDTO{
 		SiteCode: site.SiteCode, Env: site.Env, NamespaceId: ns,
 		DataId: dataId, Group: group,
-		Content: passMaskRe.ReplaceAllString(content, "${1}******${2}"),
+		Content: masked,
 		Exists:  content != "",
 	}, nil
 }
@@ -98,13 +101,17 @@ func (s *sSiteConfig) Rollback(ctx context.Context, siteId int64, version int, o
 	return s.doPublish(ctx, siteId, rec.Content, operator, fmt.Sprintf("回滚自 v%d", version))
 }
 
-// doPublish 发布主流程: 校验yaml -> 注入database段 -> 发布Nacos -> 落发布记录(存原文)。
+// doPublish 发布主流程: 校验yaml -> 注入 database/paas 段 -> 发布Nacos -> 落发布记录(存原文)。
 func (s *sSiteConfig) doPublish(ctx context.Context, siteId int64, content string, operator int64, remark string) (*service.PublishDTO, error) {
 	site, ns, dataId, group, err := s.target(ctx, siteId)
 	if err != nil {
 		return nil, err
 	}
 	rendered, err := injectDatabase(ctx, content, site)
+	if err != nil {
+		return nil, err
+	}
+	rendered, err = injectPaas(ctx, rendered, site)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +155,25 @@ func injectDatabase(ctx context.Context, content string, site *entity.Site) (str
 		return dbBlock, nil
 	}
 	return body + "\n\n" + dbBlock, nil
+}
+
+// injectPaas 将站点 APPKEY/APPSECRET 写入顶层 paas 段(有则整块替换)。
+// 历史站尚无凭证时跳过, 不阻断配置发布。
+func injectPaas(ctx context.Context, content string, site *entity.Site) (string, error) {
+	_ = ctx
+	if strings.TrimSpace(site.AppKey) == "" || strings.TrimSpace(site.AppSecret) == "" {
+		return content, nil
+	}
+	secret, err := kit.Decrypt(site.AppSecret)
+	if err != nil {
+		return "", gerror.Wrap(err, "解密站点 APPSECRET 失败")
+	}
+	block := "paas:\n  app_key: " + strconv.Quote(site.AppKey) + "\n  app_secret: " + strconv.Quote(secret) + "\n"
+	rest := strings.TrimRight(removeTopLevelYAMLKey(content, "paas"), "\n")
+	if rest == "" {
+		return block, nil
+	}
+	return rest + "\n\n" + block, nil
 }
 
 // replaceOrInsertDatabaseLink 在原文 database 段内替换或插入 link 行, 其它行保持不变。

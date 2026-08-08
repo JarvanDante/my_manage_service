@@ -24,6 +24,7 @@ type SiteItem struct {
 	DbName       string `json:"db_name"`
 	DbUser       string `json:"db_user"`
 	DbPass       string `json:"db_pass"` // 永远脱敏 ******
+	AppKey       string `json:"app_key"` // PaaS APPKEY; secret 不在列表/详情返回
 	Remark       string `json:"remark"`
 	CreatedAt    string `json:"created_at"`
 }
@@ -70,7 +71,29 @@ type CreateReq struct {
 	Remark     string `json:"remark"`
 }
 type CreateRes struct {
-	Id int64 `json:"id"`
+	Id        int64  `json:"id"`
+	AppKey    string `json:"app_key"`
+	AppSecret string `json:"app_secret"`
+}
+
+// 查看 PaaS APPSECRET(AES 解密回显, 可重复查看)
+type RevealSecretReq struct {
+	g.Meta `path:"/sites/{id}/app-secret" method:"get" tags:"Manage/Site" summary:"查看站点 PaaS APPSECRET"`
+	Id     int64 `json:"id" v:"required|min:1#站点ID必填|站点ID必须大于0"`
+}
+type RevealSecretRes struct {
+	AppKey    string `json:"app_key"`
+	AppSecret string `json:"app_secret"`
+}
+
+// 重置 PaaS APPSECRET(历史站无 key 时一并补发 APPKEY)
+type ResetSecretReq struct {
+	g.Meta `path:"/sites/{id}/reset-secret" method:"post" tags:"Manage/Site" summary:"重置站点 PaaS APPSECRET"`
+	Id     int64 `json:"id" v:"required|min:1#站点ID必填|站点ID必须大于0"`
+}
+type ResetSecretRes struct {
+	AppKey    string `json:"app_key"`
+	AppSecret string `json:"app_secret"`
 }
 
 // 更新站点(site_code 不可改; db_pass 空=不改)

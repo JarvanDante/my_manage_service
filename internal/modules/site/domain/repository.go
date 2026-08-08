@@ -28,6 +28,7 @@ type Repository interface {
 	FindByCode(ctx context.Context, code string) (*entity.Site, error)
 	Create(ctx context.Context, s *entity.Site) (int64, error)
 	Update(ctx context.Context, s *entity.Site) error
+	UpdateAppCredentials(ctx context.Context, id int64, appKey, encSecret string) error
 	SetStatus(ctx context.Context, id int64, status int) error
 	MerchantExists(ctx context.Context, merchantId int64) (bool, error)
 

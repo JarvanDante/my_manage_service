@@ -15,6 +15,8 @@ type Site struct {
 	DbName     string      `json:"dbName"     orm:"db_name"`
 	DbUser     string      `json:"dbUser"     orm:"db_user"`
 	DbPass     string      `json:"dbPass"     orm:"db_pass"`
+	AppKey     string      `json:"appKey"     orm:"app_key"`
+	AppSecret  string      `json:"appSecret"  orm:"app_secret"` // AES 密文
 	Remark     string      `json:"remark"     orm:"remark"`
 	CreatedAt  *gtime.Time `json:"createdAt"  orm:"created_at"`
 	UpdatedAt  *gtime.Time `json:"updatedAt"  orm:"updated_at"`

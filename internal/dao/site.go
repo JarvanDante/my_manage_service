@@ -70,7 +70,9 @@ func (r *siteRepo) Create(ctx context.Context, s *entity.Site) (int64, error) {
 		"merchant_id": s.MerchantId, "site_code": s.SiteCode, "name": s.Name,
 		"env": s.Env, "status": 0,
 		"db_host": s.DbHost, "db_port": s.DbPort, "db_name": s.DbName,
-		"db_user": s.DbUser, "db_pass": s.DbPass, "remark": s.Remark,
+		"db_user": s.DbUser, "db_pass": s.DbPass,
+		"app_key": s.AppKey, "app_secret": s.AppSecret,
+		"remark": s.Remark,
 	}).Insert()
 	if err != nil {
 		return 0, err
@@ -95,6 +97,14 @@ func (r *siteRepo) Update(ctx context.Context, s *entity.Site) error {
 func (r *siteRepo) SetStatus(ctx context.Context, id int64, status int) error {
 	_, err := g.Model("site").Ctx(ctx).Where("id", id).Data(g.Map{
 		"status": status, "updated_at": gtime.Now(),
+	}).Update()
+	return err
+}
+
+// UpdateAppCredentials 更新/补发 PaaS 凭证(app_secret 已加密)。
+func (r *siteRepo) UpdateAppCredentials(ctx context.Context, id int64, appKey, encSecret string) error {
+	_, err := g.Model("site").Ctx(ctx).Where("id", id).Data(g.Map{
+		"app_key": appKey, "app_secret": encSecret, "updated_at": gtime.Now(),
 	}).Update()
 	return err
 }

@@ -16,8 +16,22 @@ type SiteDTO struct {
 	DbName       string
 	DbUser       string
 	DbPassMask   string // 永远脱敏
+	AppKey       string // 可展示; secret 永不出现在列表/详情
 	Remark       string
 	CreatedAt    string
+}
+
+// CreateResult 创建站点结果(含明文 APPSECRET, 之后仍可通过 RevealSecret 查看)。
+type CreateResult struct {
+	Id        int64
+	AppKey    string
+	AppSecret string
+}
+
+// AppCredentialsDTO APPKEY + 明文 APPSECRET。
+type AppCredentialsDTO struct {
+	AppKey    string
+	AppSecret string
 }
 
 type DomainDTO struct {
@@ -84,11 +98,13 @@ type DbCheckDTO struct {
 type ISite interface {
 	List(ctx context.Context, in ListInput) (*ListDTO, error)
 	Detail(ctx context.Context, id int64) (*SiteDetailDTO, error)
-	Create(ctx context.Context, in SaveInput) (int64, error)
+	Create(ctx context.Context, in SaveInput) (*CreateResult, error)
 	Update(ctx context.Context, in SaveInput) error
 	SetStatus(ctx context.Context, id int64, status int) error
 	DbCheck(ctx context.Context, id int64) (*DbCheckDTO, error)
 	ProvisionCheck(ctx context.Context, id int64) (*ProvisionDTO, error)
+	RevealSecret(ctx context.Context, id int64) (*AppCredentialsDTO, error)
+	ResetSecret(ctx context.Context, id int64) (*AppCredentialsDTO, error)
 
 	BindDomain(ctx context.Context, siteId int64, domain string, https int) (int64, error)
 	UnbindDomain(ctx context.Context, siteId, domainId int64) error

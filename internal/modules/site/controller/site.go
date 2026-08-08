@@ -43,9 +43,9 @@ func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.Det
 	return &v1.DetailRes{SiteItem: toItem(&d.SiteDTO), Domains: domains}, nil
 }
 
-// Create 创建站点。
+// Create 创建站点(同时发放 PaaS APPKEY/APPSECRET, secret 仅本次明文返回)。
 func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.CreateRes, err error) {
-	id, err := c.site.Create(ctx, service.SaveInput{
+	out, err := c.site.Create(ctx, service.SaveInput{
 		MerchantId: req.MerchantId, SiteCode: req.SiteCode, Name: req.Name, Env: req.Env,
 		DbHost: req.DbHost, DbPort: req.DbPort, DbName: req.DbName,
 		DbUser: req.DbUser, DbPass: req.DbPass, Remark: req.Remark,
@@ -53,7 +53,25 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 	if err != nil {
 		return nil, err
 	}
-	return &v1.CreateRes{Id: id}, nil
+	return &v1.CreateRes{Id: out.Id, AppKey: out.AppKey, AppSecret: out.AppSecret}, nil
+}
+
+// RevealSecret 查看 APPSECRET(AES 解密回显)。
+func (c *Controller) RevealSecret(ctx context.Context, req *v1.RevealSecretReq) (res *v1.RevealSecretRes, err error) {
+	out, err := c.site.RevealSecret(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RevealSecretRes{AppKey: out.AppKey, AppSecret: out.AppSecret}, nil
+}
+
+// ResetSecret 重置 APPSECRET。
+func (c *Controller) ResetSecret(ctx context.Context, req *v1.ResetSecretReq) (res *v1.ResetSecretRes, err error) {
+	out, err := c.site.ResetSecret(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ResetSecretRes{AppKey: out.AppKey, AppSecret: out.AppSecret}, nil
 }
 
 // Update 更新站点。
@@ -115,7 +133,7 @@ func toItem(s *service.SiteDTO) v1.SiteItem {
 		Id: s.Id, MerchantId: s.MerchantId, MerchantName: s.MerchantName,
 		SiteCode: s.SiteCode, Name: s.Name, Env: s.Env, Status: s.Status,
 		DbHost: s.DbHost, DbPort: s.DbPort, DbName: s.DbName, DbUser: s.DbUser,
-		DbPass: s.DbPassMask, Remark: s.Remark, CreatedAt: s.CreatedAt,
+		DbPass: s.DbPassMask, AppKey: s.AppKey, Remark: s.Remark, CreatedAt: s.CreatedAt,
 	}
 }
 

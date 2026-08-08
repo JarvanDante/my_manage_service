@@ -93,43 +93,110 @@ func checkSave(in service.SaveInput) error {
 	return nil
 }
 
-func (s *sSite) Create(ctx context.Context, in service.SaveInput) (int64, error) {
+func (s *sSite) Create(ctx context.Context, in service.SaveInput) (*service.CreateResult, error) {
 	in.SiteCode = strings.ToUpper(strings.TrimSpace(in.SiteCode))
 	if !codeRe.MatchString(in.SiteCode) {
-		return 0, gerror.New("site_code 须为 2~32 位大写英文字母(不含数字与特殊符号)")
+		return nil, gerror.New("site_code 须为 2~32 位大写英文字母(不含数字与特殊符号)")
 	}
 	if err := checkSave(in); err != nil {
-		return 0, err
+		return nil, err
 	}
 	if in.DbPass == "" {
-		return 0, gerror.New("数据库密码必填")
+		return nil, gerror.New("数据库密码必填")
 	}
 	if in.MerchantId <= 0 {
-		return 0, gerror.New("请指定商户")
+		return nil, gerror.New("请指定商户")
 	}
 	ok, err := s.repo.MerchantExists(ctx, in.MerchantId)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if !ok {
-		return 0, gerror.New("商户不存在或已停用")
+		return nil, gerror.New("商户不存在或已停用")
 	}
 	exist, err := s.repo.FindByCode(ctx, in.SiteCode)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if exist != nil {
-		return 0, gerror.New("site_code 已存在")
+		return nil, gerror.New("site_code 已存在")
 	}
 	encPass, err := kit.Encrypt(in.DbPass)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return s.repo.Create(ctx, &entity.Site{
+	appKey, plainSecret, encSecret, err := newAppCredentials()
+	if err != nil {
+		return nil, err
+	}
+	id, err := s.repo.Create(ctx, &entity.Site{
 		MerchantId: in.MerchantId, SiteCode: in.SiteCode, Name: in.Name, Env: in.Env,
 		DbHost: in.DbHost, DbPort: in.DbPort, DbName: in.DbName, DbUser: in.DbUser,
-		DbPass: encPass, Remark: in.Remark,
+		DbPass: encPass, AppKey: appKey, AppSecret: encSecret, Remark: in.Remark,
 	})
+	if err != nil {
+		return nil, err
+	}
+	return &service.CreateResult{Id: id, AppKey: appKey, AppSecret: plainSecret}, nil
+}
+
+// RevealSecret 解密回显 APPSECRET(可重复查看; 列表/详情默认仍脱敏)。
+func (s *sSite) RevealSecret(ctx context.Context, id int64) (*service.AppCredentialsDTO, error) {
+	site, err := s.mustSite(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(site.AppKey) == "" || strings.TrimSpace(site.AppSecret) == "" {
+		return nil, gerror.New("该站尚未生成 PaaS 凭证, 请先重置/生成")
+	}
+	plain, err := kit.Decrypt(site.AppSecret)
+	if err != nil {
+		return nil, gerror.Wrap(err, "解密 APPSECRET 失败(MANAGE_SECRET 是否与登记时一致?)")
+	}
+	return &service.AppCredentialsDTO{AppKey: site.AppKey, AppSecret: plain}, nil
+}
+
+// ResetSecret 重置 APPSECRET; 若尚无 APPKEY(历史站)则一并补发。
+func (s *sSite) ResetSecret(ctx context.Context, id int64) (*service.AppCredentialsDTO, error) {
+	site, err := s.mustSite(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	appKey := strings.TrimSpace(site.AppKey)
+	if appKey == "" {
+		appKey, err = kit.NewAppKey()
+		if err != nil {
+			return nil, gerror.Wrap(err, "生成 APPKEY 失败")
+		}
+	}
+	plainSecret, err := kit.NewAppSecret()
+	if err != nil {
+		return nil, gerror.Wrap(err, "生成 APPSECRET 失败")
+	}
+	encSecret, err := kit.Encrypt(plainSecret)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.repo.UpdateAppCredentials(ctx, id, appKey, encSecret); err != nil {
+		return nil, err
+	}
+	return &service.AppCredentialsDTO{AppKey: appKey, AppSecret: plainSecret}, nil
+}
+
+func newAppCredentials() (appKey, plainSecret, encSecret string, err error) {
+	appKey, err = kit.NewAppKey()
+	if err != nil {
+		return "", "", "", gerror.Wrap(err, "生成 APPKEY 失败")
+	}
+	plainSecret, err = kit.NewAppSecret()
+	if err != nil {
+		return "", "", "", gerror.Wrap(err, "生成 APPSECRET 失败")
+	}
+	encSecret, err = kit.Encrypt(plainSecret)
+	if err != nil {
+		return "", "", "", err
+	}
+	return appKey, plainSecret, encSecret, nil
 }
 
 func (s *sSite) Update(ctx context.Context, in service.SaveInput) error {
@@ -318,7 +385,7 @@ func toDTO(e *entity.Site) *service.SiteDTO {
 		Id: e.Id, MerchantId: e.MerchantId, SiteCode: e.SiteCode, Name: e.Name,
 		Env: e.Env, Status: e.Status,
 		DbHost: e.DbHost, DbPort: e.DbPort, DbName: e.DbName, DbUser: e.DbUser,
-		DbPassMask: "******", Remark: e.Remark, CreatedAt: fmtTime(e.CreatedAt),
+		DbPassMask: "******", AppKey: e.AppKey, Remark: e.Remark, CreatedAt: fmtTime(e.CreatedAt),
 	}
 }
 
