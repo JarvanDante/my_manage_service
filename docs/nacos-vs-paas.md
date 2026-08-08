@@ -66,3 +66,4 @@ PaaS **不是**「再下一份配置文件」：子站在业务链路里 **同�
 - 站点凭证：`manifest/sql/migrations/00011_site_app_credentials.sql`
 - 子站字段差异：my_service `docs/site-features-nacos.md`
 - 子站 Nacos 模板：my_service `docs/nacos-config-my.yaml`
+- 媒资中心服务：`my_media`（中央池 API；转码 Worker 见 `my_transcode`）
