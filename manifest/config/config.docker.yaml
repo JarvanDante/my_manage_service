@@ -1,0 +1,40 @@
+# Docker 容器内配置：通过 jarven 网络访问 postgres / redis / nacos
+# 媒资 my_media 若仍跑在宿主机，用 host.docker.internal:8004
+
+server:
+  address:     ":8003"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+logger:
+  level:  "all"
+  stdout: true
+
+database:
+  default:
+    link:  "pgsql:postgres:654321@tcp(postgres:5432)/my_manage?sslmode=disable"
+    debug: true
+
+redis:
+  default:
+    address: "redis:6379"
+    db:      1
+
+nacospub:
+  addr:  "nacos:8848"
+  user:  "nacos"
+  pass:  "nacos"
+  group: "DEFAULT_GROUP"
+  namespaces:
+    dev:  "dev"
+    test: "test"
+    prod: ""
+
+provision:
+  gooseVersion: 0
+
+paas:
+  media:
+    enabled: true
+    base_url: "http://my_media:8004"
+    admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
