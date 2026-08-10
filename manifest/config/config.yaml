@@ -44,3 +44,7 @@ paas:
     enabled: true
     base_url: "http://127.0.0.1:8015"
     admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
+  ad:
+    enabled: true
+    base_url: "http://127.0.0.1:8016"
+    admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"

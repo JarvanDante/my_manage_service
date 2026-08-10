@@ -38,7 +38,7 @@
 | 统一存储 | `/paas/storage` | 同上 |
 | 统一播放 | `/paas/play` | 同上 |
 | 支付中台 | `/paas/pay` | 同上 |
-| 广告中台 | `/paas/ad` | 同上 |
+| 广告中台 | `/paas/ad` | 同上（服务 `my_ad` :8016） |
 
 - 开站即签发站点凭证（`site.app_key` / `app_secret`）；配置发布时注入 Nacos 的 `paas` 段，供子站读取。
 - 业务配置（渠道、广告位等）落在 **PaaS 控制面 / 各能力服务**，按 `app_key` 识别调用方站点，而不是再 YAML 下发到每站。

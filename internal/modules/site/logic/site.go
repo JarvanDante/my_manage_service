@@ -13,6 +13,7 @@ import (
 	"github.com/JarvanDante/my_manage_service/internal/model/entity"
 	"github.com/JarvanDante/my_manage_service/internal/modules/site/domain"
 	"github.com/JarvanDante/my_manage_service/internal/modules/site/service"
+	"github.com/JarvanDante/my_manage_service/internal/shared/adsync"
 	"github.com/JarvanDante/my_manage_service/internal/shared/kit"
 	"github.com/JarvanDante/my_manage_service/internal/shared/mediasync"
 	"github.com/JarvanDante/my_manage_service/internal/shared/storagesync"
@@ -141,6 +142,7 @@ func (s *sSite) Create(ctx context.Context, in service.SaveInput) (*service.Crea
 	}
 	mediasync.UpsertClient(ctx, appKey, plainSecret, in.SiteCode)
 	storagesync.UpsertClient(ctx, appKey, plainSecret, in.SiteCode)
+	adsync.UpsertClient(ctx, appKey, plainSecret, in.SiteCode)
 	return &service.CreateResult{Id: id, AppKey: appKey, AppSecret: plainSecret}, nil
 }
 
@@ -186,6 +188,7 @@ func (s *sSite) ResetSecret(ctx context.Context, id int64) (*service.AppCredenti
 	}
 	mediasync.UpsertClient(ctx, appKey, plainSecret, site.SiteCode)
 	storagesync.UpsertClient(ctx, appKey, plainSecret, site.SiteCode)
+	adsync.UpsertClient(ctx, appKey, plainSecret, site.SiteCode)
 	return &service.AppCredentialsDTO{AppKey: appKey, AppSecret: plainSecret}, nil
 }
 
