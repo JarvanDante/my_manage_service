@@ -13,9 +13,9 @@ VALUES
  (110, 0,   '平台服务',   '/paas',           '',                 '', 'lucide:boxes',           1, 0, 0, '', 40),
  (111, 110, '媒资中心',   '/paas/media',     'paas/media/index', '', 'lucide:clapperboard',    1, 0, 0, '', 1),
  (112, 110, '统一存储',   '/paas/storage',   'paas/storage/index','','lucide:hard-drive',      1, 0, 0, '', 2),
- (113, 110, '播放服务',   '/paas/play',      'paas/play/index',  '', 'lucide:play-circle',     1, 0, 0, '', 3),
+ (113, 110, '统一播放',   '/paas/play',      'paas/play/index',  '', 'lucide:play-circle',     1, 0, 0, '', 3),
  (114, 110, '支付中台',   '/paas/pay',       'paas/pay/index',   '', 'lucide:wallet',          1, 0, 0, '', 4),
- (115, 110, '广告平台',   '/paas/ad',        'paas/ad/index',    '', 'lucide:megaphone',       1, 0, 0, '', 5)
+ (115, 110, '广告中台',   '/paas/ad',        'paas/ad/index',    '', 'lucide:megaphone',       1, 0, 0, '', 5)
 ON CONFLICT (id) DO UPDATE SET
     parent_id    = EXCLUDED.parent_id,
     name         = EXCLUDED.name,
