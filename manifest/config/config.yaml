@@ -25,6 +25,7 @@ nacospub:
   user:  "nacos"
   pass:  "nacos"
   group: "DEFAULT_GROUP"
+  service_group: "SERVICE"   # 平台服务配置发布分组(与站点 DEFAULT_GROUP 区分)
   namespaces:
     dev:  "dev"    # 命名空间ID(你建的是自定义ID, 正好与名称一致)
     test: "test"

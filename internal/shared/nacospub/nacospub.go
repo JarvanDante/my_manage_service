@@ -52,6 +52,11 @@ func Group(ctx context.Context) string {
 	return g.Cfg().MustGet(ctx, "nacospub.group", "DEFAULT_GROUP").String()
 }
 
+// ServiceGroup 平台服务配置发布分组(与站点配置区分, 默认 SERVICE)。
+func ServiceGroup(ctx context.Context) string {
+	return g.Cfg().MustGet(ctx, "nacospub.service_group", "SERVICE").String()
+}
+
 func getClient(ctx context.Context, namespaceId string) (config_client.IConfigClient, error) {
 	mu.Lock()
 	defer mu.Unlock()

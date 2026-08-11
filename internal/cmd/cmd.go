@@ -14,6 +14,7 @@ import (
 	monmod "github.com/JarvanDante/my_manage_service/internal/modules/monitor"
 	sitemod "github.com/JarvanDante/my_manage_service/internal/modules/site"
 	scmod "github.com/JarvanDante/my_manage_service/internal/modules/siteconfig"
+	svccfgmod "github.com/JarvanDante/my_manage_service/internal/modules/svcconfig"
 	"github.com/JarvanDante/my_manage_service/internal/shared/middleware"
 )
 
@@ -41,6 +42,7 @@ var Main = gcmd.Command{
 				merchmod.Register(perm, dao.NewMerchantRepo())
 				sitemod.Register(perm, dao.NewSiteRepo())
 				scmod.Register(perm, dao.NewSiteConfigRepo())
+				svccfgmod.Register(perm, dao.NewSvcConfigRepo())
 				monmod.Register(perm, dao.NewMonitorRepo())
 			})
 		})
