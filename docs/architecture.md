@@ -8,7 +8,7 @@
 | | my_service(数据面) | my_manage_service(控制面) |
 |---|---|---|
 | 部署 | 一站一部署(front/backend/cron) | 全局一套 |
-| 数据库 | 每站一库(my_service, 站B库…) | my_manage 一库 |
+| 数据库 | 每站一库(如 my, 站B库…) | my_manage 一库 |
 | 配置来源 | 启动从 Nacos 拉(SITE_CODE) | 本地 config.yaml + env |
 | Nacos 角色 | 只读(消费配置) | 只写(发布配置, nacos-sdk-go) |
 | 管理员 | admin_user(站点库) | manage_admin(互不相通) |

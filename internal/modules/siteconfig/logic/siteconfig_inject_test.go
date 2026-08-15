@@ -39,13 +39,13 @@ func TestReplaceOrInsertDatabaseLinkKeepsDebugFalse(t *testing.T) {
 database:
   default:
     debug: false
-    link: "pgsql:postgres:old@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
+    link: "pgsql:postgres:old@tcp(127.0.0.1:5432)/my?sslmode=disable"
 
 redis:
   default:
     address: "127.0.0.1:6379"
 `
-	got := replaceOrInsertDatabaseLink(in, "pgsql:postgres:new@tcp(127.0.0.1:5432)/my_service?sslmode=disable")
+	got := replaceOrInsertDatabaseLink(in, "pgsql:postgres:new@tcp(127.0.0.1:5432)/my?sslmode=disable")
 	if !strings.Contains(got, "debug: false") {
 		t.Fatalf("debug:false must stay:\n%s", got)
 	}
