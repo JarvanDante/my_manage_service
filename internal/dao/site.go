@@ -136,9 +136,9 @@ func (r *siteRepo) FindDomainById(ctx context.Context, id int64) (*entity.SiteDo
 	return d, err
 }
 
-func (r *siteRepo) BindDomain(ctx context.Context, siteId int64, domain string, https, isMain int) (int64, error) {
+func (r *siteRepo) BindDomain(ctx context.Context, siteId int64, domain, kind string, https, isMain int) (int64, error) {
 	res, err := g.Model("site_domain").Ctx(ctx).Data(g.Map{
-		"site_id": siteId, "domain": domain, "https": https, "is_main": isMain, "status": 1,
+		"site_id": siteId, "domain": domain, "kind": kind, "https": https, "is_main": isMain, "status": 1,
 	}).Insert()
 	if err != nil {
 		return 0, err

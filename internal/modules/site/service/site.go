@@ -37,6 +37,7 @@ type AppCredentialsDTO struct {
 type DomainDTO struct {
 	Id     int64
 	Domain string
+	Kind   string // admin / h5 / app
 	IsMain int
 	Https  int
 	Status int
@@ -106,7 +107,7 @@ type ISite interface {
 	RevealSecret(ctx context.Context, id int64) (*AppCredentialsDTO, error)
 	ResetSecret(ctx context.Context, id int64) (*AppCredentialsDTO, error)
 
-	BindDomain(ctx context.Context, siteId int64, domain string, https int) (int64, error)
+	BindDomain(ctx context.Context, siteId int64, domain, kind string, https int) (int64, error)
 	UnbindDomain(ctx context.Context, siteId, domainId int64) error
 	SetMainDomain(ctx context.Context, siteId, domainId int64) error
 }

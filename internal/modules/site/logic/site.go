@@ -72,7 +72,7 @@ func (s *sSite) Detail(ctx context.Context, id int64) (*service.SiteDetailDTO, e
 	ds := make([]*service.DomainDTO, 0, len(domains))
 	for _, d := range domains {
 		ds = append(ds, &service.DomainDTO{
-			Id: d.Id, Domain: d.Domain, IsMain: d.IsMain, Https: d.Https, Status: d.Status,
+			Id: d.Id, Domain: d.Domain, Kind: d.Kind, IsMain: d.IsMain, Https: d.Https, Status: d.Status,
 		})
 	}
 	dto := toDTO(&item.Site)
@@ -294,6 +294,15 @@ func normalizeDomain(raw string) string {
 	return d
 }
 
+func normalizeDomainKind(kind string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "admin", "h5", "app":
+		return strings.ToLower(strings.TrimSpace(kind)), nil
+	default:
+		return "", gerror.New("域名用途仅支持 admin/h5/app")
+	}
+}
+
 func validDomain(domainName string) bool {
 	if !domainRe.MatchString(domainName) {
 		return false
@@ -318,8 +327,12 @@ func validDomain(domainName string) bool {
 	return true
 }
 
-func (s *sSite) BindDomain(ctx context.Context, siteId int64, domainName string, https int) (int64, error) {
+func (s *sSite) BindDomain(ctx context.Context, siteId int64, domainName, kind string, https int) (int64, error) {
 	if _, err := s.mustSite(ctx, siteId); err != nil {
+		return 0, err
+	}
+	kind, err := normalizeDomainKind(kind)
+	if err != nil {
 		return 0, err
 	}
 	domainName = normalizeDomain(domainName)
@@ -345,7 +358,7 @@ func (s *sSite) BindDomain(ctx context.Context, siteId int64, domainName string,
 	if https != 0 && https != 1 {
 		https = 1
 	}
-	return s.repo.BindDomain(ctx, siteId, domainName, https, isMain)
+	return s.repo.BindDomain(ctx, siteId, domainName, kind, https, isMain)
 }
 
 func (s *sSite) UnbindDomain(ctx context.Context, siteId, domainId int64) error {

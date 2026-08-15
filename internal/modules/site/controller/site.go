@@ -37,7 +37,7 @@ func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.Det
 	domains := make([]v1.DomainItem, 0, len(d.Domains))
 	for _, dm := range d.Domains {
 		domains = append(domains, v1.DomainItem{
-			Id: dm.Id, Domain: dm.Domain, IsMain: dm.IsMain, Https: dm.Https, Status: dm.Status,
+			Id: dm.Id, Domain: dm.Domain, Kind: dm.Kind, IsMain: dm.IsMain, Https: dm.Https, Status: dm.Status,
 		})
 	}
 	return &v1.DetailRes{SiteItem: toItem(&d.SiteDTO), Domains: domains}, nil
@@ -105,7 +105,7 @@ func (c *Controller) DbCheck(ctx context.Context, req *v1.DbCheckReq) (res *v1.D
 
 // DomainBind 绑定域名。
 func (c *Controller) DomainBind(ctx context.Context, req *v1.DomainBindReq) (res *v1.DomainBindRes, err error) {
-	id, err := c.site.BindDomain(ctx, req.Id, req.Domain, req.Https)
+	id, err := c.site.BindDomain(ctx, req.Id, req.Domain, req.Kind, req.Https)
 	if err != nil {
 		return nil, err
 	}

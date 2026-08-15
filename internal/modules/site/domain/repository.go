@@ -36,7 +36,7 @@ type Repository interface {
 	Domains(ctx context.Context, siteId int64) ([]*entity.SiteDomain, error)
 	FindDomain(ctx context.Context, domain string) (*entity.SiteDomain, error)
 	FindDomainById(ctx context.Context, id int64) (*entity.SiteDomain, error)
-	BindDomain(ctx context.Context, siteId int64, domain string, https, isMain int) (int64, error)
+	BindDomain(ctx context.Context, siteId int64, domain, kind string, https, isMain int) (int64, error)
 	UnbindDomain(ctx context.Context, id int64) error
 	SetMainDomain(ctx context.Context, siteId, domainId int64) error
 }

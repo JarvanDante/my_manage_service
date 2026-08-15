@@ -6,6 +6,7 @@ import "github.com/gogf/gf/v2/frame/g"
 type DomainItem struct {
 	Id     int64  `json:"id"`
 	Domain string `json:"domain"`
+	Kind   string `json:"kind"` // admin / h5 / app
 	IsMain int    `json:"is_main"`
 	Https  int    `json:"https"`
 	Status int    `json:"status"`
@@ -136,6 +137,7 @@ type DomainBindReq struct {
 	g.Meta `path:"/sites/{id}/domains" method:"post" tags:"Manage/Site" summary:"绑定域名"`
 	Id     int64  `json:"id"     v:"required|min:1#站点ID必填|站点ID必须大于0"`
 	Domain string `json:"domain" v:"required#域名必填"`
+	Kind   string `json:"kind"   v:"required|in:admin,h5,app#域名用途必填|域名用途仅支持 admin/h5/app"`
 	Https  int    `json:"https"  v:"in:0,1#https 仅支持 0/1"`
 }
 type DomainBindRes struct {
