@@ -79,3 +79,51 @@ func TestReplaceOrInsertDatabaseLinkInsertsWhenMissing(t *testing.T) {
 		t.Fatalf("link not inserted:\n%s", got)
 	}
 }
+
+func TestReplaceOrInsertPaasCredsKeepsAdBase(t *testing.T) {
+	in := `logger:
+  level: "all"
+
+paas:
+  app_key: "old_key"
+  app_secret: "old_secret"
+  media_base: "http://my_media:8004"
+  storage_base: "http://my_storage:8005"
+  ad_base: "http://my_ad:8006"
+
+redis:
+  default:
+    address: "127.0.0.1:6379"
+`
+	got := replaceOrInsertPaasCreds(in, "ak_new", "secret_new")
+	if !strings.Contains(got, `app_key: "ak_new"`) {
+		t.Fatalf("app_key not updated:\n%s", got)
+	}
+	if !strings.Contains(got, `app_secret: "secret_new"`) {
+		t.Fatalf("app_secret not updated:\n%s", got)
+	}
+	if !strings.Contains(got, `ad_base: "http://my_ad:8006"`) ||
+		!strings.Contains(got, `media_base: "http://my_media:8004"`) ||
+		!strings.Contains(got, `storage_base: "http://my_storage:8005"`) {
+		t.Fatalf("paas extras must stay:\n%s", got)
+	}
+	if strings.Contains(got, "old_key") || strings.Contains(got, "old_secret") {
+		t.Fatalf("old creds still present:\n%s", got)
+	}
+	if !strings.Contains(got, `level: "all"`) || !strings.Contains(got, "redis:") {
+		t.Fatalf("other sections changed:\n%s", got)
+	}
+}
+
+func TestReplaceOrInsertPaasCredsInsertsWhenMissing(t *testing.T) {
+	in := `paas:
+  ad_base: "http://my_ad:8006"
+`
+	got := replaceOrInsertPaasCreds(in, "ak_1", "sec_1")
+	if !strings.Contains(got, `app_key: "ak_1"`) || !strings.Contains(got, `app_secret: "sec_1"`) {
+		t.Fatalf("creds not inserted:\n%s", got)
+	}
+	if !strings.Contains(got, `ad_base: "http://my_ad:8006"`) {
+		t.Fatalf("ad_base lost:\n%s", got)
+	}
+}

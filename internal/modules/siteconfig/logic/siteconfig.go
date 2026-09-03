@@ -3,6 +3,7 @@
 // 关键设计:
 //   - 发布记录存"未注入 database 段"的原文 —— 库里不落站点DB明文密码;
 //   - 发布/回滚时保留原文; 仅覆盖 database.default.link 为站点登记库连接;
+//   - paas 段只改/补 app_key、app_secret, 不整块替换;
 //   - 查看当前配置时对 link 里的密码脱敏。
 package logic
 
@@ -25,10 +26,13 @@ import (
 )
 
 var (
-	passMaskRe      = regexp.MustCompile(`(pgsql:[^:@]+:)[^@]+(@)`)
-	appSecretMaskRe = regexp.MustCompile(`(?m)^([ \t]*app_secret\s*:\s*).+$`)
-	linkLineRe      = regexp.MustCompile(`^([ \t]*)link\s*:.*$`)
-	defaultRe       = regexp.MustCompile(`^([ \t]*)default\s*:\s*(#.*)?$`)
+	passMaskRe          = regexp.MustCompile(`(pgsql:[^:@]+:)[^@]+(@)`)
+	appSecretMaskRe     = regexp.MustCompile(`(?m)^([ \t]*app_secret\s*:\s*).+$`)
+	linkLineRe          = regexp.MustCompile(`^([ \t]*)link\s*:.*$`)
+	defaultRe           = regexp.MustCompile(`^([ \t]*)default\s*:\s*(#.*)?$`)
+	paasAppKeyLineRe    = regexp.MustCompile(`^([ \t]*)app_key\s*:.*$`)
+	paasAppSecretLineRe = regexp.MustCompile(`^([ \t]*)app_secret\s*:.*$`)
+	paasKeyRe           = regexp.MustCompile(`^paas\s*:\s*(#.*)?$`)
 )
 
 type sSiteConfig struct {
@@ -157,7 +161,8 @@ func injectDatabase(ctx context.Context, content string, site *entity.Site) (str
 	return body + "\n\n" + dbBlock, nil
 }
 
-// injectPaas 将站点 APPKEY/APPSECRET 写入顶层 paas 段(有则整块替换)。
+// injectPaas 将站点 APPKEY/APPSECRET 写入顶层 paas 段。
+// 已有 paas 段时只改/补 app_key、app_secret，ad_base / media_base 等其余字段一字不动。
 // 历史站尚无凭证时跳过, 不阻断配置发布。
 func injectPaas(ctx context.Context, content string, site *entity.Site) (string, error) {
 	_ = ctx
@@ -168,12 +173,67 @@ func injectPaas(ctx context.Context, content string, site *entity.Site) (string,
 	if err != nil {
 		return "", gerror.Wrap(err, "解密站点 APPSECRET 失败")
 	}
+	if strings.TrimSpace(extractTopLevelYAMLBlock(content, "paas")) != "" {
+		return replaceOrInsertPaasCreds(content, site.AppKey, secret), nil
+	}
 	block := "paas:\n  app_key: " + strconv.Quote(site.AppKey) + "\n  app_secret: " + strconv.Quote(secret) + "\n"
-	rest := strings.TrimRight(removeTopLevelYAMLKey(content, "paas"), "\n")
-	if rest == "" {
+	body := strings.TrimRight(content, "\n")
+	if body == "" {
 		return block, nil
 	}
-	return rest + "\n\n" + block, nil
+	return body + "\n\n" + block, nil
+}
+
+// replaceOrInsertPaasCreds 在原文 paas 段内替换或插入凭证行, 其它行保持不变。
+func replaceOrInsertPaasCreds(content, appKey, secret string) string {
+	keyQuoted := strconv.Quote(appKey)
+	secretQuoted := strconv.Quote(secret)
+	block := extractTopLevelYAMLBlock(content, "paas")
+	rest := strings.TrimRight(removeTopLevelYAMLKey(content, "paas"), "\n")
+
+	lines := strings.Split(block, "\n")
+	hasKey, hasSecret := false, false
+	for i, line := range lines {
+		if m := paasAppKeyLineRe.FindStringSubmatch(line); m != nil {
+			lines[i] = m[1] + "app_key: " + keyQuoted
+			hasKey = true
+			continue
+		}
+		if m := paasAppSecretLineRe.FindStringSubmatch(line); m != nil {
+			lines[i] = m[1] + "app_secret: " + secretQuoted
+			hasSecret = true
+		}
+	}
+	if !hasKey || !hasSecret {
+		out := make([]string, 0, len(lines)+2)
+		inserted := false
+		for _, line := range lines {
+			out = append(out, line)
+			if !inserted && paasKeyRe.MatchString(line) {
+				if !hasKey {
+					out = append(out, "  app_key: "+keyQuoted)
+				}
+				if !hasSecret {
+					out = append(out, "  app_secret: "+secretQuoted)
+				}
+				inserted = true
+			}
+		}
+		if !inserted {
+			if !hasKey {
+				out = append(out, "  app_key: "+keyQuoted)
+			}
+			if !hasSecret {
+				out = append(out, "  app_secret: "+secretQuoted)
+			}
+		}
+		lines = out
+	}
+	newBlock := strings.Join(lines, "\n")
+	if rest == "" {
+		return newBlock
+	}
+	return rest + "\n\n" + newBlock
 }
 
 // replaceOrInsertDatabaseLink 在原文 database 段内替换或插入 link 行, 其它行保持不变。
