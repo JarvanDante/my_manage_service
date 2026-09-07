@@ -12,6 +12,8 @@ type Repository interface {
 	FindByUsername(ctx context.Context, username string) (*entity.ManageAdmin, error)
 	FindById(ctx context.Context, id int64) (*entity.ManageAdmin, error)
 	UpdateLoginInfo(ctx context.Context, id int64, ip string) error
+	BindTotp(ctx context.Context, id int64, secret string) error
+	ResetTotp(ctx context.Context, id int64) error
 
 	// 角色(M6)
 	ListRoles(ctx context.Context) ([]*entity.ManageRole, error)

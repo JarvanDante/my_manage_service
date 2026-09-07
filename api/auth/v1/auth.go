@@ -15,10 +15,15 @@ type LoginReq struct {
 	g.Meta   `path:"/auth/login" method:"post" tags:"Manage/Auth" summary:"总后台登录"`
 	Username string `json:"username" v:"required#账号必填"`
 	Password string `json:"password" v:"required#密码必填"`
+	TotpCode string `json:"totp_code"`
 }
 type LoginRes struct {
-	Token string    `json:"token"`
-	Admin AdminInfo `json:"admin"`
+	Token      string    `json:"token,omitempty"`
+	Admin      AdminInfo `json:"admin,omitempty"`
+	NeedTotp   bool      `json:"need_totp"`
+	TotpBound  bool      `json:"totp_bound"`
+	TotpQR     string    `json:"totp_qr,omitempty"`
+	TotpSecret string    `json:"totp_secret,omitempty"`
 }
 
 // 退出(需登录)

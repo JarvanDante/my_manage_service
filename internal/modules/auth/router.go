@@ -26,6 +26,6 @@ func RegisterPermManage(group *ghttp.RouterGroup, repo domain.Repository) {
 	group.Bind(
 		ctrl.RoleList, ctrl.RoleCreate, ctrl.RoleUpdate, ctrl.RoleDelete,
 		ctrl.PermTree, ctrl.PermCreate, ctrl.PermUpdate, ctrl.PermDelete,
-		ctrl.AdminList, ctrl.AdminCreate, ctrl.AdminUpdate, ctrl.AdminDelete,
+		ctrl.AdminList, ctrl.AdminCreate, ctrl.AdminUpdate, ctrl.AdminDelete, ctrl.AdminResetTotp,
 	)
 }

@@ -35,6 +35,24 @@ func (r *authRepo) UpdateLoginInfo(ctx context.Context, id int64, ip string) err
 	return err
 }
 
+func (r *authRepo) BindTotp(ctx context.Context, id int64, secret string) error {
+	_, err := g.Model("manage_admin").Ctx(ctx).Where("id", id).Data(g.Map{
+		"totp_secret":   secret,
+		"totp_bound_at": gtime.Now(),
+		"updated_at":    gtime.Now(),
+	}).Update()
+	return err
+}
+
+func (r *authRepo) ResetTotp(ctx context.Context, id int64) error {
+	_, err := g.Model("manage_admin").Ctx(ctx).Where("id", id).Data(g.Map{
+		"totp_secret":   "",
+		"totp_bound_at": nil,
+		"updated_at":    gtime.Now(),
+	}).Update()
+	return err
+}
+
 // ==================== 角色(M6) ====================
 
 func (r *authRepo) ListRoles(ctx context.Context) ([]*entity.ManageRole, error) {

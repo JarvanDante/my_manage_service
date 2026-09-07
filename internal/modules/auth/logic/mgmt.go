@@ -104,9 +104,16 @@ func (s *sAuth) ListAdmins(ctx context.Context, page, size int) (*service.AdminL
 		if a.LastLoginAt != nil {
 			last = a.LastLoginAt.String()
 		}
+		totpAt := ""
+		totpOn := 0
+		if totpBound(a) {
+			totpOn = 1
+			totpAt = a.TotpBoundAt.String()
+		}
 		items = append(items, &service.AdminItemDTO{
 			Id: a.Id, Username: a.Username, Nickname: a.Nickname,
 			RoleId: a.RoleId, RoleName: roleName[a.RoleId], Status: a.Status, LastLoginAt: last,
+			TotpBound: totpOn, TotpBoundAt: totpAt,
 		})
 	}
 	return &service.AdminListDTO{List: items, Total: total, Page: page, Size: size}, nil
