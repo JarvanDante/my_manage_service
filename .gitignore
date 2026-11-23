@@ -3,3 +3,8 @@ bin/
 .DS_Store
 .idea/
 temp/
+
+# 构建产物与编译输出
+dist/
+*.exe
+/my_manage_service
